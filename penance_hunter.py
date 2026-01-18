@@ -24,7 +24,7 @@ def _():
     import pyfiglet
     from pathlib import Path
     import io
-    return alt, io, mo, pd, pyfiglet, re
+    return Path, alt, io, mo, pd, pyfiglet, re
 
 
 @app.cell
@@ -69,7 +69,7 @@ def _(mo):
 
 
 @app.cell
-def _(csv_upload, io, mo, pd, re):
+def _(Path, csv_upload, io, mo, pd, re):
     default_penance = mo.notebook_location() / "public" / "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
 
     if csv_upload.value:
@@ -78,7 +78,7 @@ def _(csv_upload, io, mo, pd, re):
         penance_export_contents = csv_upload.contents()
     else:
         penance_export_filename = default_penance.name
-        penance_export_contents = default_penance.read_bytes()
+        penance_export_contents = Path(default_penance).read_bytes()
 
     penances_df = pd.DataFrame()
 
