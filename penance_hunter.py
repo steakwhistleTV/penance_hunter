@@ -24,8 +24,7 @@ def _():
     import pyfiglet
     from pathlib import Path
     import io
-    import urllib.request
-    return alt, io, mo, pd, pyfiglet, re, urllib
+    return alt, io, mo, pd, pyfiglet, re
 
 
 @app.cell
@@ -70,17 +69,16 @@ def _(mo):
 
 
 @app.cell
-def _(csv_upload, io, mo, pd, re, urllib):
-    SAMPLE_FILENAME = "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
-    default_penance_path = mo.notebook_location() / "public" / SAMPLE_FILENAME
+def _(csv_upload, io, mo, pd, re):
+    default_penance = mo.notebook_location() / "public" / "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
 
     if csv_upload.value:
-        penance_export_filename = csv_upload.name()
+        penance_export = csv_upload
+        penance_export_filename = penance_export.name()
         penance_export_contents = csv_upload.contents()
     else:
-        penance_export_filename = SAMPLE_FILENAME
-        with urllib.request.urlopen(str(default_penance_path)) as response:
-            penance_export_contents = response.read()
+        penance_export_filename = default_penance.name
+        penance_export_contents = default_penance.read_bytes()
 
     penances_df = pd.DataFrame()
 
