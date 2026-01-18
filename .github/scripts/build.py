@@ -15,12 +15,13 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Export the notebook as a readonly app
+    # -o should be a directory, marimo creates index.html inside it
     cmd = [
         "uvx", "marimo", "export", "html-wasm",
         "--sandbox",
         "--mode", "run",
         "penance_hunter.py",
-        "-o", str(output_dir / "index.html")
+        "-o", str(output_dir)
     ]
 
     print(f"Running: {' '.join(cmd)}")
