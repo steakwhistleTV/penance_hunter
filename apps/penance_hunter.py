@@ -24,7 +24,8 @@ def _():
     import pyfiglet
     from pathlib import Path
     import io
-    return Path, alt, io, mo, pd, pyfiglet, re
+    import sys
+    return alt, io, mo, pd, pyfiglet, re, sys
 
 
 @app.cell
@@ -57,32 +58,42 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
+def _(mo, sys):
+    default_penance = mo.notebook_location() / "public" / "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
+
+    def is_wasm() -> bool:
+        return "pyodide" in sys.modules
+
     csv_upload = mo.ui.file(
         filetypes=[".csv"],  # only allow CSVs
         multiple=False,
         kind="button",       # or "area" for drag-and-drop
         label="select your penance export csv",
     )
-    csv_upload
-    return (csv_upload,)
+    mo.vstack([mo.md(f"notebook running as WASM: {is_wasm()}"),
+               csv_upload])
+    return csv_upload, default_penance, is_wasm
 
 
 @app.cell
-def _(Path, csv_upload, io, mo, pd, re):
-    default_penance = mo.notebook_location() / "public" / "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
-
+def _(csv_upload, default_penance, io, is_wasm, pd, re):
     if csv_upload.value:
         penance_export = csv_upload
         penance_export_filename = penance_export.name()
         penance_export_contents = csv_upload.contents()
     else:
         penance_export_filename = default_penance.name
-        penance_export_contents = Path(default_penance).read_bytes()
+
+        if is_wasm():
+            import pyodide.http
+            resp = pyodide.http.open_url(str(default_penance))
+            penance_export_contents = resp.read().encode("utf-8")
+        else:
+            penance_export_contents = default_penance.read_bytes()
 
     penances_df = pd.DataFrame()
 
-    print("~ now reading file: ", penance_export_filename)
+    print(f"~ now reading file: {penance_export_filename} ({type(penance_export_contents)})")
     penances_df = pd.read_csv(io.BytesIO(penance_export_contents), comment='#')
     penances_df['Completion_Time'] = pd.to_datetime(penances_df['Completion_Time'], errors='coerce')
     penances_df['EXPORT_FILE'] = penance_export_filename
@@ -451,19 +462,15 @@ def _(
     style_cell,
     tactical_table,
 ):
-    selected_penances = [
-        t.value
-        for t in [class_table,
-                  havoc_table,
-                  exploration_table,
-                  in_progress_table,
-                  tactical_table,
-                  missions_table
-                 ]
-        if t.value is not None and len(t.value) > 0
-    ]
+    selected_penances = []
+    for t in [class_table, havoc_table, exploration_table, in_progress_table, tactical_table, missions_table]:
+        if t.value is not None and isinstance(t.value, pd.DataFrame) and len(t.value) > 0:
+            selected_penances.append(t.value)
 
-    selected_df = pd.concat(selected_penances, ignore_index=True) if selected_penances else pd.DataFrame()
+    if selected_penances:
+        selected_df = pd.concat(selected_penances, ignore_index=True)
+    else:
+        selected_df = pd.DataFrame(columns=["Title", "Description", "Achievement_ID", "Progress", "Goal", "PROGRESS_DIFF", "Progress_Percentage"])
 
     selected_table = mo.ui.table(selected_df,
                                  selection="multi",
