@@ -5,8 +5,10 @@ __pycache__/
 *.pyo
 *.egg-info/
 
-# marimo
+# marimo / build outputs
 *.wasm.html
+dist/
+_site/
 
 # OS
 .DS_Store

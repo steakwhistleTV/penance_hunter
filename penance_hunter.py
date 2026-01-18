@@ -14,10 +14,7 @@
 import marimo
 
 __generated_with = "0.19.4"
-app = marimo.App(
-    width="full",
-    layout_file="layouts/penance_hunter.grid.json",
-)
+app = marimo.App(width="full", layout_file="layouts/penance_hunter.grid.json")
 
 
 @app.cell
@@ -59,7 +56,7 @@ def _(mo):
         filetypes=[".csv"],  # only allow CSVs
         multiple=False,
         kind="button",       # or "area" for drag-and-drop
-        label="Upload a CSV file",
+        label="select your penance export csv",
     )
     csv_upload
     return (csv_upload,)
@@ -81,7 +78,7 @@ def _(csv_upload, io, pd, re):
     ts_match = re.search(r'[0-9a-f-]+_([0-9]{8})_([0-9]{6})\.csv', str(penance_export.name()))
 
     if ts_match:
-    
+
         # Join the two parts: 20230515_123045 → 20230515123045
         ts_string = ts_match.group(1) + ts_match.group(2)
         # Convert to pandas datetime (nanoseconds resolution by default)
