@@ -1,7 +1,7 @@
 [project]
 name = "penance-hunter"
 version = "0.1.0"
-description = "Add your description here"
+description = "export and vizualization for Penance tracking in Warhammer 40,000: Darktide"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,7 +9,6 @@ dependencies = [
     "marimo[mcp]>=0.17.0",
     "openai>=2.6.0",
     "pandas>=2.3.3",
-    "polars>=1.36.1",
     "pyarrow>=22.0.0",
     "pyfiglet>=1.0.4",
     "seaborn>=0.13.2",
