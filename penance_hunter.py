@@ -4,10 +4,8 @@
 #     "altair==6.0.0",
 #     "marimo",
 #     "pandas==2.3.3",
-#     "polars==1.37.1",
 #     "pyarrow",
 #     "pyfiglet==1.0.4",
-#     "pyzmq",
 # ]
 # ///
 
@@ -23,7 +21,6 @@ def _():
     import pandas as pd
     import datetime, re
     import altair as alt
-    import polars as pl
     import pyfiglet
     from pathlib import Path
     import io
