@@ -71,19 +71,16 @@ def _(mo):
 @app.cell
 def _(csv_upload, io, mo, pd, re):
     SAMPLE_FILENAME = "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
-    default_penance = mo.notebook_location() / "public" / SAMPLE_FILENAME
+    default_penance_path = mo.notebook_location() / "public" / SAMPLE_FILENAME
 
     if csv_upload.value:
         penance_export_filename = csv_upload.name()
-        penance_export_contents = csv_upload.contents()
+        penances_df = pd.read_csv(io.BytesIO(csv_upload.contents()), comment='#')
     else:
         penance_export_filename = SAMPLE_FILENAME
-        penance_export_contents = default_penance.read_bytes()
-
-    penances_df = pd.DataFrame()
+        penances_df = pd.read_csv(str(default_penance_path), comment='#')
 
     print("~ now reading file: ", penance_export_filename)
-    penances_df = pd.read_csv(io.BytesIO(penance_export_contents), comment='#')
     penances_df['Completion_Time'] = pd.to_datetime(penances_df['Completion_Time'], errors='coerce')
     penances_df['EXPORT_FILE'] = penance_export_filename
     penances_df['EXPORT_FILE'] = penances_df['EXPORT_FILE'].astype(str)
