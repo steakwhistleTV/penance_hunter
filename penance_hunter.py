@@ -33,9 +33,18 @@ def _(mo, pyfiglet):
     penance_title =  pyfiglet.figlet_format(f"{' '*20}notebook visualizer 40k", font="double_blocky", width=200)
 
     with mo.redirect_stdout():
+    
         print(nurgle_ascii)
         print(penance_title)
         print()
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md("""
+    works with penance_exporter mod output (CSV) refer to -> https://github.com/steakwhistleTV/penance_hunter
+    """)
     return
 
 
