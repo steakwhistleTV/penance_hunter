@@ -69,20 +69,16 @@ def _(mo):
 
 
 @app.cell
-def _(csv_upload, io, pd, re):
-    import urllib.request
-
-    SAMPLE_CSV_URL = "https://raw.githubusercontent.com/steakwhistletv/penance_hunter/main/examples/00000000-0000-0000-0000-000000000000_20260118_103938.csv"
+def _(csv_upload, io, mo, pd, re):
     SAMPLE_FILENAME = "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
+    default_penance = mo.notebook_location() / "public" / SAMPLE_FILENAME
 
     if csv_upload.value:
         penance_export_filename = csv_upload.name()
         penance_export_contents = csv_upload.contents()
     else:
-        # Fetch sample from GitHub for WASM compatibility
-        with urllib.request.urlopen(SAMPLE_CSV_URL) as response:
-            penance_export_contents = response.read()
         penance_export_filename = SAMPLE_FILENAME
+        penance_export_contents = default_penance.read_bytes()
 
     penances_df = pd.DataFrame()
 
