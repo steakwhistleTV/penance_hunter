@@ -33,7 +33,7 @@ def _(mo, pyfiglet):
     penance_title =  pyfiglet.figlet_format(f"{' '*20}notebook visualizer 40k", font="double_blocky", width=200)
 
     with mo.redirect_stdout():
-    
+
         print(nurgle_ascii)
         print(penance_title)
         print()
@@ -69,19 +69,28 @@ def _(mo):
 
 
 @app.cell
-def _(csv_upload, io, pd, re):
-    penance_export = csv_upload
+def _(csv_upload, io, mo, pd, re):
+    default_penance = mo.notebook_dir() / "examples" / "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
+
+    if csv_upload.value:
+        penance_export = csv_upload
+        penance_export_filename = penance_export.name()
+        penance_export_contents = csv_upload.contents()
+    else:
+        penance_export_filename = default_penance.name
+        penance_export_contents = default_penance.read_bytes()
+
     penances_df = pd.DataFrame()
 
-    print("~ now reading file: ", penance_export.name())
-    penances_df = pd.read_csv(io.BytesIO(penance_export.contents()), comment='#')
+    print("~ now reading file: ", penance_export_filename)
+    penances_df = pd.read_csv(io.BytesIO(penance_export_contents), comment='#')
     penances_df['Completion_Time'] = pd.to_datetime(penances_df['Completion_Time'], errors='coerce')
-    penances_df['EXPORT_FILE'] = penance_export.name()
+    penances_df['EXPORT_FILE'] = penance_export_filename
     penances_df['EXPORT_FILE'] = penances_df['EXPORT_FILE'].astype(str)
 
     # Updated regex to match Account ID (UUID format)
-    match = re.search(r'[0-9a-f-]+_([0-9]{8})_[0-9]{6}\.csv', str(penance_export.name()))
-    ts_match = re.search(r'[0-9a-f-]+_([0-9]{8})_([0-9]{6})\.csv', str(penance_export.name()))
+    match = re.search(r'[0-9a-f-]+_([0-9]{8})_[0-9]{6}\.csv', str(penance_export_filename))
+    ts_match = re.search(r'[0-9a-f-]+_([0-9]{8})_([0-9]{6})\.csv', str(penance_export_filename))
 
     if ts_match:
 
@@ -114,11 +123,24 @@ def _(csv_upload, io, pd, re):
     active_df = penances_df[penances_df['Status'] == 'In Progress'].copy()
     active_df = active_df.sort_values(by='Progress_Percentage', ascending=False)
     print(f"~ created dataframe of in-progess penances ({len(active_df)} rows)")
-    return active_df, completed_df, penance_export, penances_df
+    return (
+        active_df,
+        completed_df,
+        penance_export_contents,
+        penance_export_filename,
+        penances_df,
+    )
 
 
 @app.cell
-def _(io, mo, pd, penance_export, penances_df):
+def _(
+    io,
+    mo,
+    pd,
+    penance_export_contents,
+    penance_export_filename,
+    penances_df,
+):
 
     class_mapping = {
         'veteran': 'Veteran',
@@ -138,9 +160,9 @@ def _(io, mo, pd, penance_export, penances_df):
               return class_value
       return 'Unknown'
 
-    def get_account_metadata(csv_upload):
+    def get_account_metadata(csv_contents, filename):
         """Extract account metadata from CSV comments"""
-        contents = csv_upload.contents()
+        contents = csv_contents
         if contents is None:
             return None
 
@@ -249,15 +271,12 @@ def _(io, mo, pd, penance_export, penances_df):
 
         print(f" -- {str(current_date)} --")
 
-        print(f"  loading penances for completion tracking from export_file --> {penance_export.name()}\n")
+        print(f"  loading penances for completion tracking from export_file --> {penance_export_filename}\n")
 
-        print(f"\n\n  - Export details -")
-
-        #for cls, count in (penances_df['Status'].value_counts(dropna=False).items()):
-        #    print(f"   {cls:<10} {count:>5}")
+        print(f"\n  - Export details -")
 
          # Get metadata
-        meta = get_account_metadata(penance_export)
+        meta = get_account_metadata(penance_export_contents,penance_export_filename)
 
         # Enhanced print output
         print(f"\n    exported by: {penances_df['Export_Character'].unique()[0]} ({penances_df['Export_Account'].unique()[0]})")
@@ -305,8 +324,6 @@ def _(io, mo, pd, penance_export, penances_df):
         class_df = class_df.sort_values('Completion_Time')
         class_df['Cumulative_Count_Per_Class'] = class_df.groupby('Penance_Class').cumcount() + 1
         last_points = class_df.groupby('Penance_Class').last().reset_index()
-
-
 
         for cls, row in class_summary.sort_index().iterrows():
             completed = int(row.completed)
