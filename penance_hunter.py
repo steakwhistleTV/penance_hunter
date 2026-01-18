@@ -24,7 +24,8 @@ def _():
     import pyfiglet
     from pathlib import Path
     import io
-    return alt, io, mo, pd, pyfiglet, re
+    import urllib.request
+    return alt, io, mo, pd, pyfiglet, re, urllib
 
 
 @app.cell
@@ -69,18 +70,22 @@ def _(mo):
 
 
 @app.cell
-def _(csv_upload, io, mo, pd, re):
+def _(csv_upload, io, mo, pd, re, urllib):
     SAMPLE_FILENAME = "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
     default_penance_path = mo.notebook_location() / "public" / SAMPLE_FILENAME
 
     if csv_upload.value:
         penance_export_filename = csv_upload.name()
-        penances_df = pd.read_csv(io.BytesIO(csv_upload.contents()), comment='#')
+        penance_export_contents = csv_upload.contents()
     else:
         penance_export_filename = SAMPLE_FILENAME
-        penances_df = pd.read_csv(str(default_penance_path), comment='#')
+        with urllib.request.urlopen(str(default_penance_path)) as response:
+            penance_export_contents = response.read()
+
+    penances_df = pd.DataFrame()
 
     print("~ now reading file: ", penance_export_filename)
+    penances_df = pd.read_csv(io.BytesIO(penance_export_contents), comment='#')
     penances_df['Completion_Time'] = pd.to_datetime(penances_df['Completion_Time'], errors='coerce')
     penances_df['EXPORT_FILE'] = penance_export_filename
     penances_df['EXPORT_FILE'] = penances_df['EXPORT_FILE'].astype(str)
