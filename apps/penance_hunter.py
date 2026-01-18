@@ -7,6 +7,8 @@
 #     "pyarrow",
 #     "pyfiglet==1.0.4",
 # ]
+# [tool.marimo.display]
+# theme = "dark"
 # ///
 
 import marimo
