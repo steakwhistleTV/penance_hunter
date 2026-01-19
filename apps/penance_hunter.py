@@ -33,7 +33,7 @@ def _():
 @app.cell
 def _(mo, pyfiglet):
     nurgle_ascii = pyfiglet.figlet_format("Penance Hunter", font="bloody", width=200)
-    penance_title =  pyfiglet.figlet_format(f"{' '*20}notebook visualizer 40k", font="double_blocky", width=200)
+    penance_title =  pyfiglet.figlet_format(f"{' '*18}notebook visualizer 40k", font="double_blocky", width=200)
 
     with mo.redirect_stdout():
 
@@ -46,7 +46,7 @@ def _(mo, pyfiglet):
 @app.cell
 def _(mo):
     mo.md("""
-    works with penance_exporter mod output (CSV) refer to -> https://github.com/steakwhistleTV/penance_hunter
+    requires penance_exporter mod output (CSV) refer to -> https://github.com/steakwhistleTV/penance_hunter
     """)
     return
 
@@ -72,20 +72,25 @@ def _(mo, sys):
         kind="button",       # or "area" for drag-and-drop
         label="select your penance export csv",
     )
-    mo.vstack([mo.md(f"notebook running as WASM: {is_wasm()}"),
-               csv_upload])
+    #mo.vstack([mo.md(f"notebook running as WASM: {is_wasm()}"), csv_upload])
+    csv_upload
     return csv_upload, default_penance, is_wasm
 
 
 @app.cell
 def _(csv_upload, default_penance, io, is_wasm, pd, re):
-    if csv_upload.value:
+    penances_df = pd.DataFrame()
+
+    # check for user provided export otherwise use sample
+    if csv_upload.value:   
         penance_export = csv_upload
         penance_export_filename = penance_export.name()
         penance_export_contents = csv_upload.contents()
-    else:
+
+    else:    
         penance_export_filename = default_penance.name
 
+        # added this check since mo.notebook_location() behaves different for WASM GitHub pages vs being ran locally
         if is_wasm():
             import pyodide.http
             resp = pyodide.http.open_url(str(default_penance))
@@ -93,46 +98,51 @@ def _(csv_upload, default_penance, io, is_wasm, pd, re):
         else:
             penance_export_contents = default_penance.read_bytes()
 
-    penances_df = pd.DataFrame()
-
+    # parse export into master penance dataframe
     print(f"~ now reading file: {penance_export_filename} ({type(penance_export_contents)})")
     penances_df = pd.read_csv(io.BytesIO(penance_export_contents), comment='#')
+    print(f"~ created dataframe from penance export ({len(penances_df)} rows)")
+
+    # convert timestamps to datetime format
     penances_df['Completion_Time'] = pd.to_datetime(penances_df['Completion_Time'], errors='coerce')
+
+    # label with source export file
     penances_df['EXPORT_FILE'] = penance_export_filename
     penances_df['EXPORT_FILE'] = penances_df['EXPORT_FILE'].astype(str)
 
-    # Updated regex to match Account ID (UUID format)
+    # regex for extracting timestamps and dates from export filenames
     match = re.search(r'[0-9a-f-]+_([0-9]{8})_[0-9]{6}\.csv', str(penance_export_filename))
     ts_match = re.search(r'[0-9a-f-]+_([0-9]{8})_([0-9]{6})\.csv', str(penance_export_filename))
 
-    if ts_match:
+    # extract export date from filename
+    penances_df['EXPORT_DATE'] = match.group(1).title() if match else "Unknown"
 
-        # Join the two parts: 20230515_123045 → 20230515123045
+    # Extract and convert export TS from filename
+    if ts_match:
         ts_string = ts_match.group(1) + ts_match.group(2)
-        # Convert to pandas datetime (nanoseconds resolution by default)
         penances_df['EXPORT_TS'] = pd.to_datetime(
             ts_string,
-            format='%Y%m%d%H%M%S',   # matches 20230515123045
-            errors='coerce'          # → NaT if parsing fails
+            format='%Y%m%d%H%M%S',
+            errors='coerce'
         )
     else:
-        # Pattern didn't match – keep as missing datetime
         penances_df['EXPORT_TS'] = pd.NaT
 
-    penances_df['EXPORT_DATE'] = match.group(1).title() if match else "Unknown"
+    # sort by completion time & count for cumulative progress
     penances_df = penances_df.sort_values('Completion_Time')
-    penances_df["Cumulative_Count"] = range(1, len(penances_df) + 1)
-    penances_df['PROGRESS_DIFF'] = penances_df['Goal'] - penances_df['Progress']
+    penances_df["CUMULATIVE_COUNT"] = range(1, len(penances_df) + 1)
 
+    # calculate progress remaining & re-sort by least
+    penances_df['PROGRESS_DIFF'] = penances_df['Goal'] - penances_df['Progress']
     penances_df = penances_df.sort_values(by='PROGRESS_DIFF', ascending=True)
 
-    print(f"~ created dataframe from penance export ({len(penances_df)} rows)")
-
+    # create completed dataframe
     completed_df = penances_df[penances_df['Status'] == 'Completed'].copy()
     completed_df['Completion_Time'] = pd.to_datetime(completed_df['Completion_Time'])
     completed_df['Completion_Date'] = completed_df['Completion_Time'].dt.date
     print(f"~ created dataframe of completed penances ({len(completed_df)} rows)")
 
+    # create active dataframe
     active_df = penances_df[penances_df['Status'] == 'In Progress'].copy()
     active_df = active_df.sort_values(by='Progress_Percentage', ascending=False)
     print(f"~ created dataframe of in-progess penances ({len(active_df)} rows)")
@@ -237,6 +247,10 @@ def _(
                                                             'loc_achievement_subcategory_missions_survival_label'
                                                            ])].sort_values(by='PROGRESS_DIFF', ascending=True).copy()
 
+    weapons_df = penances_df[penances_df['Category'].isin(['loc_weapon_progression_mastery',
+                                                           'loc_achievement_category_weapons_label'
+                                                          ])].sort_values(by='PROGRESS_DIFF', ascending=True).copy() 
+
     exploration_terms = ['group_mission_zone_wide',
                         'collectible',
                         'destructible',
@@ -247,18 +261,10 @@ def _(
 
     exploration_regex = '|'.join(exploration_terms)
 
-
-    # Filter DataFrame
     exploration_df = penances_df[
         (penances_df['Achievement_ID'].str.contains(exploration_regex, case=False, na=False)) |
         (penances_df['Category'].isin(['loc_achievement_subcategory_twins_mission_label']))
     ].sort_values(by='PROGRESS_DIFF', ascending=True).copy()
-
-
-
-    weapons_df = penances_df[penances_df['Category'].isin(['loc_weapon_progression_mastery',
-                                                           'loc_achievement_category_weapons_label'
-                                                          ])].sort_values(by='PROGRESS_DIFF', ascending=True).copy() 
 
     leftover_df = penances_df[~penances_df['Category'].isin(['loc_class_abilities_title',
                                                              'loc_class_progression_title',
@@ -335,7 +341,7 @@ def _(
         class_summary['pct'] = class_summary['completed'] / class_summary['total']
 
         class_df = class_df.sort_values('Completion_Time')
-        class_df['Cumulative_Count_Per_Class'] = class_df.groupby('Penance_Class').cumcount() + 1
+        class_df['CCOUNT_PER_CLASS'] = class_df.groupby('Penance_Class').cumcount() + 1
         last_points = class_df.groupby('Penance_Class').last().reset_index()
 
         for cls, row in class_summary.sort_index().iterrows():
@@ -498,7 +504,12 @@ def _(completed_page, in_progress_page, mo, tracked_page):
 
 @app.cell
 def _(class_progression_chart, completed_df, cumulative_chart, mo):
-    completed_page = mo.vstack([mo.md("---"),mo.md("### Completed Penances"),mo.ui.table(completed_df),cumulative_chart,class_progression_chart])
+    completed_page = mo.vstack([mo.md("---"),
+                                mo.md("### Completed Penances"),
+                                mo.ui.table(completed_df),
+                                cumulative_chart,
+                                class_progression_chart
+                               ])
     return (completed_page,)
 
 
@@ -507,11 +518,11 @@ def _(alt, class_df, completed_df, current_date, last_points, mo):
     # Create interactive Altair chart - Cumulative completions over time
     cumulative_chart = alt.Chart(completed_df).mark_line(point=True).encode(
       x=alt.X('Completion_Time:T', title='Completion Date'),
-      y=alt.Y('Cumulative_Count:Q', title='Total Penances Completed'),
+      y=alt.Y('CUMULATIVE_COUNT:Q', title='Total Penances Completed'),
       tooltip=[
           alt.Tooltip('Completion_Time:T', title='Date'),
           alt.Tooltip('Title:N', title='Penance'),
-          alt.Tooltip('Cumulative_Count:Q', title='Total Completed'),
+          alt.Tooltip('CUMULATIVE_COUNT:Q', title='Total Completed'),
           alt.Tooltip('Score:Q', title='Score')
       ]
     ).properties(
@@ -523,12 +534,12 @@ def _(alt, class_df, completed_df, current_date, last_points, mo):
     # Create cumulative chart by penance class
     class_progression_chart = alt.Chart(class_df).mark_line(point=True).encode(
       x=alt.X('Completion_Time:T', title='Date'),
-      y=alt.Y('Cumulative_Count_Per_Class:Q', title='Operative Penances Completed'),
+      y=alt.Y('CCOUNT_PER_CLASS:Q', title='Operative Penances Completed'),
       color=alt.Color('Penance_Class:N', title='Class'),
       tooltip=[
           alt.Tooltip('Penance_Class:N', title='Class'),
           alt.Tooltip('Completion_Time:T', title='Date'),
-          alt.Tooltip('Cumulative_Count_Per_Class:Q', title='Total for this class'),
+          alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for this class'),
           alt.Tooltip('Title:N', title='Penance')
       ]
     ).properties(
@@ -540,12 +551,12 @@ def _(alt, class_df, completed_df, current_date, last_points, mo):
     # Create the line chart
     line_chart = alt.Chart(class_df).mark_line(point=True).encode(
       x=alt.X('Completion_Time:T', title='Date', scale=alt.Scale(domain=[class_df['Completion_Time'].min(), current_date])),
-      y=alt.Y('Cumulative_Count_Per_Class:Q', title='Operative Penances Completed'),
+      y=alt.Y('CCOUNT_PER_CLASS:Q', title='Operative Penances Completed'),
       color=alt.Color('Penance_Class:N', title='Class'),
       tooltip=[
           alt.Tooltip('Penance_Class:N', title='Class'),
           alt.Tooltip('Completion_Time:T', title='Date'),
-          alt.Tooltip('Cumulative_Count_Per_Class:Q', title='Total for this class'),
+          alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for this class'),
           alt.Tooltip('Title:N', title='Penance')
       ]
     )
@@ -553,12 +564,12 @@ def _(alt, class_df, completed_df, current_date, last_points, mo):
     # Create the last points layer with larger markers
     last_points_chart = alt.Chart(last_points).mark_point(size=200, filled=True).encode(
       x=alt.X('Completion_Time:T', scale=alt.Scale(domain=[class_df['Completion_Time'].min(), current_date])),
-      y=alt.Y('Cumulative_Count_Per_Class:Q'),
+      y=alt.Y('CCOUNT_PER_CLASS:Q'),
       color=alt.Color('Penance_Class:N', title='Class'),
       tooltip=[
           alt.Tooltip('Penance_Class:N', title='Class'),
           alt.Tooltip('Completion_Time:T', title='Date'),
-          alt.Tooltip('Cumulative_Count_Per_Class:Q', title='Total for this class')
+          alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for this class')
       ]
     )
 
@@ -578,8 +589,7 @@ def _(alt, class_df, completed_df, current_date, last_points, mo):
 
 
 @app.cell
-def _(class_progression_chart, cumulative_chart, mo):
-    mo.vstack([cumulative_chart,class_progression_chart])
+def _():
     return
 
 
