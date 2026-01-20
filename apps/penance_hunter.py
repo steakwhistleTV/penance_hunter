@@ -17,7 +17,7 @@ __generated_with = "0.19.4"
 app = marimo.App(width="full", layout_file="layouts/penance_hunter.grid.json")
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import marimo as mo
     import pandas as pd
@@ -30,7 +30,7 @@ def _():
     return alt, io, mo, pd, pyfiglet, re, sys
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, pyfiglet):
     nurgle_ascii = pyfiglet.figlet_format("Penance Hunter", font="bloody", width=200)
     penance_title =  pyfiglet.figlet_format(f"{' '*18}notebook visualizer 40k", font="double_blocky", width=200)
@@ -43,7 +43,7 @@ def _(mo, pyfiglet):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
     requires penance_exporter mod output (CSV) refer to -> https://github.com/steakwhistleTV/penance_hunter
@@ -51,15 +51,15 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-    ---
+ 
     """)
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, sys):
     default_penance = mo.notebook_location() / "public" / "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
 
@@ -69,7 +69,7 @@ def _(mo, sys):
     csv_upload = mo.ui.file(
         filetypes=[".csv"],  # only allow CSVs
         multiple=False,
-        kind="button",       # or "area" for drag-and-drop
+        kind="area",       # or "area" for drag-and-drop
         label="select your penance export csv",
     )
     #mo.vstack([mo.md(f"notebook running as WASM: {is_wasm()}"), csv_upload])
@@ -101,7 +101,7 @@ def _(csv_upload, default_penance, io, is_wasm, pd, re):
     # parse export into master penance dataframe
     print(f"~ now reading file: {penance_export_filename} ({type(penance_export_contents)})")
     penances_df = pd.read_csv(io.BytesIO(penance_export_contents), comment='#')
-    print(f"~ created dataframe from penance export ({len(penances_df)} rows)")
+
 
     # convert timestamps to datetime format
     penances_df['Completion_Time'] = pd.to_datetime(penances_df['Completion_Time'], errors='coerce')
