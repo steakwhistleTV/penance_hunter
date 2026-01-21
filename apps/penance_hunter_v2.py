@@ -39,6 +39,37 @@ def _(mo, pyfiglet):
 
 
 @app.cell
+def _(csv_upload):
+    csv_upload
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    _sidebar_title = mo.Html("""
+        <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
+        <h1 style="font-family: 'UnifrakturCook', cursive; font-size: 1.8rem;  text-shadow: 0 0 8px #5c0000;">
+            Penance Hunter
+        </h1>
+    """)
+
+    mo.sidebar(
+        [
+            _sidebar_title,
+            mo.nav_menu(
+                {
+                    "https://github.com/steakwhistleTV/penance_hunter": f"::lucide:github:: Project README",
+                    "https://github.com/steakwhistleTV/penance_hunter/tree/main/penance_exporter": f"::lucide:package:: Penance Exporter Mod",
+                },
+                orientation="vertical",
+            ),
+        ],
+        footer=mo.md("_For the Emperor!_"),
+    )
+    return
+
+
+@app.cell(hide_code=True)
 def _(mo, sys):
     default_csv = mo.notebook_location() / "public" / "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
 
@@ -135,11 +166,11 @@ def _(csv_upload, default_csv, io, is_wasm, mo, pd, re):
     active_df = active_df.sort_values(by='Progress_Percentage', ascending=False)
 
     mo.stop(False)  # Always continue
-    return account_meta, completed_df, penances_df
+    return account_meta, completed_df, export_timestamp, penances_df
 
 
 @app.cell
-def _(account_meta, completed_df, csv_upload, mo, penances_df):
+def _(account_meta, completed_df, export_timestamp, mo, penances_df):
     # Account info header
     account_name = penances_df['Export_Account'].iloc[0] if 'Export_Account' in penances_df.columns else "Unknown"
     character_name = penances_df['Export_Character'].iloc[0] if 'Export_Character' in penances_df.columns else "Unknown"
@@ -148,27 +179,80 @@ def _(account_meta, completed_df, csv_upload, mo, penances_df):
     total_completed = len(completed_df)
     completion_pct = round(total_completed / total_penances * 100, 1)
 
+    # Get completion time stats
+    earliest_completion = completed_df['Completion_Time'].min()
+    latest_completion = completed_df['Completion_Time'].max()
+
+    # Format timestamps
+    export_time_str = export_timestamp.strftime('%Y-%m-%d %H:%M') if not export_timestamp != export_timestamp else "Unknown"
+    earliest_str = earliest_completion.strftime('%Y-%m-%d') if not earliest_completion != earliest_completion else "N/A"
+    latest_str = latest_completion.strftime('%Y-%m-%d') if not latest_completion != latest_completion else "N/A"
+
+    # Main stats row
     _stats = [
-        mo.stat(label="Total Penances", value=total_penances, bordered=True),
-        mo.stat(label="Completed", value=total_completed, bordered=True),
+        mo.stat(label="Completed", value=f"{total_completed}/{total_penances}", bordered=True),
         mo.stat(label="Completion %", value=f"{completion_pct}%", bordered=True),
         mo.stat(label="Account Level", value=account_meta.get('account_level', 'N/A'), bordered=True),
+        mo.stat(label="True Level", value=account_meta.get('account_true_level', 'N/A'), bordered=True),
         mo.stat(label="Prestige", value=account_meta.get('prestige', 'N/A'), bordered=True),
     ]
 
-    _header = mo.md(f"### ::lucide:user:: **{account_name}** - {character_name}")
+    # Time stats row
+    _time_stats = [
+        mo.stat(label="Export Time", value=export_time_str, bordered=True),
+        mo.stat(label="First Completion", value=earliest_str, bordered=True),
+        mo.stat(label="Latest Completion", value=latest_str, bordered=True),
+    ]
 
-    mo.vstack([
+    # Operatives list
+    all_chars = account_meta.get('all_characters', [])
+    if all_chars:
+        import re as _re
+        _class_mapping = {
+            'veteran': 'Veteran',
+            'zealot': 'Zealot',
+            'zelot': 'Zealot',
+            'psyker': 'Psyker',
+            'ogryn': 'Ogryn',
+            'adamant': 'Arbitrator',
+            'broker': 'Hive Scum'
+        }
+        _char_stats = []
+        for char in all_chars:
+            # Parse: "1. glowm (Zealot) - Level 30 (True: 169, +139)" or "2. Zek (Hive Scum) - Level 30"
+            char_match = _re.match(r'\d+\.\s*(.+?)\s*\(([^)]+)\)\s*-\s*Level\s*(\d+)(?:\s*\(True:\s*(\d+),\s*\+(\d+)\))?', char)
+            if char_match:
+                name, cls, level, true_level, bonus = char_match.groups()
+                # Map class names (adamant -> Arbitrator, broker -> Hive Scum)
+                display_cls = _class_mapping.get(cls.lower(), cls.title())
+                if true_level and bonus:
+                    caption = f"Level {level} (True: {true_level}, +{bonus})"
+                else:
+                    caption = f"Level {level}"
+                _char_stats.append(mo.stat(label=display_cls, caption=caption, value=name, bordered=True))
+            else:
+                _char_stats.append(mo.stat(label="Unknown", value=char, bordered=True))
+        _char_section = mo.accordion({"::lucide:users:: Operatives": mo.hstack(_char_stats, wrap=True)})
+    else:
+        _char_section = None
+
+    _header = mo.md(f"### **{account_name}** - exported by {character_name}")
+
+    _content = [
         _header,
         mo.hstack(_stats, widths="equal", align="center"),
-        csv_upload,
-    ])
+        mo.hstack(_time_stats, widths="equal", align="center"),
+    ]
+    if _char_section:
+        _content.append(_char_section)
+
+    mo.vstack(_content)
     return
 
 
 @app.cell(hide_code=True)
-def _(mo, penances_df):
-    # Class mapping for filtering
+def _(alt, completed_df, mo, pd):
+    # Class mapping for extracting class from Achievement_ID
     class_mapping = {
         'veteran': 'Veteran',
         'zealot': 'Zealot',
@@ -186,114 +270,83 @@ def _(mo, penances_df):
                 return class_value
         return 'General'
 
-    penances_df['Penance_Class'] = penances_df['Achievement_ID'].apply(extract_class)
+    # Add class to completed penances
+    chart_df = completed_df.copy()
+    chart_df['Penance_Class'] = chart_df['Achievement_ID'].apply(extract_class)
 
-    # Get unique classes for dropdown
-    available_classes = ['All'] + sorted(penances_df['Penance_Class'].unique().tolist())
+    # Sort by completion time and calculate cumulative count per class
+    chart_df = chart_df.sort_values('Completion_Time')
+    chart_df['CCOUNT_PER_CLASS'] = chart_df.groupby('Penance_Class').cumcount() + 1
 
-    class_filter = mo.ui.dropdown(
-        options=available_classes,
-        value='All',
-        label="::lucide:filter:: Class"
-    )
+    # Get last point for each class (for endpoint markers)
+    last_points = chart_df.groupby('Penance_Class').last().reset_index()
 
-    status_filter = mo.ui.dropdown(
-        options=['All', 'Completed', 'In Progress'],
-        value='All',
-        label="::lucide:filter:: Status"
-    )
+    # Extend x-axis slightly past last completion
+    current_date = pd.Timestamp.now() + pd.Timedelta(days=5)
 
-    mo.hstack([class_filter, status_filter]).left()
-    return class_filter, status_filter
-
-
-@app.cell(hide_code=True)
-def _(class_filter, penances_df, status_filter):
-    # Apply filters
-    filtered_df = penances_df.copy()
-
-    if class_filter.value != 'All':
-        filtered_df = filtered_df[filtered_df['Penance_Class'] == class_filter.value]
-
-    if status_filter.value != 'All':
-        filtered_df = filtered_df[filtered_df['Status'] == status_filter.value]
-
-    filtered_df = filtered_df.sort_values(by='PROGRESS_DIFF', ascending=True)
-    return (filtered_df,)
-
-
-@app.cell(hide_code=True)
-def _(class_filter, filtered_df, mo, status_filter):
-    # Summary stats for filtered view
-    _filtered_total = len(filtered_df)
-    _filtered_completed = len(filtered_df[filtered_df['Status'] == 'Completed'])
-    _filtered_in_progress = len(filtered_df[filtered_df['Status'] == 'In Progress'])
-    _filtered_pct = round(_filtered_completed / _filtered_total * 100, 1) if _filtered_total > 0 else 0
-
-    _filter_label = f"{class_filter.value}" if class_filter.value != 'All' else "All Classes"
-    if status_filter.value != 'All':
-        _filter_label += f" ({status_filter.value})"
-
-    _cards = [
-        mo.stat(label="Showing", value=_filtered_total, bordered=True),
-        mo.stat(label="Completed", value=_filtered_completed, bordered=True),
-        mo.stat(label="In Progress", value=_filtered_in_progress, bordered=True),
-        mo.stat(label="Completion", value=f"{_filtered_pct}%", bordered=True),
-    ]
-
-    mo.vstack([
-        mo.md(f"### {_filter_label}"),
-        mo.hstack(_cards, widths="equal", align="center"),
-    ])
-    return
-
-
-@app.cell(hide_code=True)
-def _(alt, completed_df, mo, penances_df):
-    # Cumulative completion chart
-    _cumulative_chart = alt.Chart(completed_df).mark_line(point=True).encode(
-        x=alt.X('Completion_Time:T', title='Date'),
-        y=alt.Y('CUMULATIVE_COUNT:Q', title='Total Completed'),
+    # Line chart for progression
+    line_chart = alt.Chart(chart_df).mark_line(point=True).encode(
+        x=alt.X('Completion_Time:T', title='Date', scale=alt.Scale(domain=[chart_df['Completion_Time'].min(), current_date])),
+        y=alt.Y('CCOUNT_PER_CLASS:Q', title='Penances Completed'),
+        color=alt.Color('Penance_Class:N', title='Class'),
         tooltip=[
+            alt.Tooltip('Penance_Class:N', title='Class'),
             alt.Tooltip('Completion_Time:T', title='Date'),
-            alt.Tooltip('Title:N', title='Penance'),
-            alt.Tooltip('CUMULATIVE_COUNT:Q', title='Total'),
+            alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for Class'),
+            alt.Tooltip('Title:N', title='Penance')
         ]
+    )
+
+    # Endpoint markers
+    last_points_chart = alt.Chart(last_points).mark_point(size=200, filled=True).encode(
+        x=alt.X('Completion_Time:T', scale=alt.Scale(domain=[chart_df['Completion_Time'].min(), current_date])),
+        y=alt.Y('CCOUNT_PER_CLASS:Q'),
+        color=alt.Color('Penance_Class:N', title='Class'),
+        tooltip=[
+            alt.Tooltip('Penance_Class:N', title='Class'),
+            alt.Tooltip('Completion_Time:T', title='Date'),
+            alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for Class')
+        ]
+    )
+
+    # Layer together
+    class_progression_chart = (
+        line_chart + last_points_chart
     ).properties(
         width="container",
-        height=300,
-        title='Penance Completion Progress'
+        height=400,
+        title="Operative Penance Progress by Class"
     ).interactive()
 
-    # Class breakdown chart
-    class_summary = penances_df.groupby(['Penance_Class', 'Status']).size().reset_index(name='count')
-
-    _class_chart = alt.Chart(class_summary).mark_bar().encode(
-        x=alt.X('Penance_Class:N', title='Class'),
-        y=alt.Y('count:Q', title='Count'),
-        color=alt.Color('Status:N', scale=alt.Scale(
-            domain=['Completed', 'In Progress'],
-            range=['#22c55e', '#f97316']
-        )),
-        tooltip=['Penance_Class', 'Status', 'count']
-    ).properties(
-        width="container",
-        height=300,
-        title='Penances by Class'
-    )
-
-    cumulative_chart = mo.ui.altair_chart(_cumulative_chart, chart_selection=False)
-    class_chart = mo.ui.altair_chart(_class_chart, chart_selection="point")
-
-    mo.ui.tabs({
-        "::lucide:chart-line:: Progress": cumulative_chart,
-        "::lucide:chart-bar:: By Class": class_chart,
-    })
+    mo.ui.altair_chart(class_progression_chart, chart_selection=False)
     return
 
 
 @app.cell(hide_code=True)
-def _(filtered_df, mo):
+def _(mo, penances_df):
+    # Class mapping for table
+    _class_mapping = {
+        'veteran': 'Veteran',
+        'zealot': 'Zealot',
+        'zelot': 'Zealot',
+        'psyker': 'Psyker',
+        'ogryn': 'Ogryn',
+        'adamant': 'Arbitrator',
+        'broker': 'Hive Scum'
+    }
+
+    def _extract_class(achievement_id):
+        achievement_id_lower = achievement_id.lower()
+        for class_key, class_value in _class_mapping.items():
+            if class_key in achievement_id_lower:
+                return class_value
+        return 'General'
+
+    # Add class column to dataframe
+    table_df = penances_df.copy()
+    table_df['Penance_Class'] = table_df['Achievement_ID'].apply(_extract_class)
+    table_df = table_df.sort_values(by='PROGRESS_DIFF', ascending=True)
+
     # Progress table with formatting
     def progress_bar(v):
         if isinstance(v, str):
@@ -314,7 +367,7 @@ def _(filtered_df, mo):
             return {"color": "#ef4444"}
 
     _display_cols = ["Title", "Description", "Penance_Class", "Progress", "Goal", "Progress_Percentage", "Status"]
-    _table_df = filtered_df[_display_cols].reset_index(drop=True)
+    _table_df = table_df[_display_cols].reset_index(drop=True)
 
     penance_table = mo.ui.table(
         _table_df,
