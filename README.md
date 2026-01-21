@@ -101,22 +101,42 @@ The exported CSV includes metadata in comments at the top (account info, charact
 | Export_Archetype | Character class of the current selected operative |
 | Export_Mod_Date | Export timestamp |
 
-#### **Penance data** (parsed from Darktide):
+#### **Penance data** (from Darktide's achievement API):
 
 | Field | Description |
 |-------|-------------|
 | Achievement_ID | Unique penance identifier |
-| Category | Penance category (Account, Class, Tactical, etc.) |
+| Category | Penance category localization key |
 | Icon | Icon asset path |
-| Title | Penance display name |
-| Description | Penance requirements text |
-| Status | Completion status (Completed, In Progress, Locked) |
+| Title | Penance display name (localized) |
+| Description | Penance requirements text (localized) |
+| Status | Completion status (Completed, In Progress) |
 | Progress | Current progress value |
 | Goal | Target value to complete |
-| Progress_Percentage | Completion percentage (0-100) |
+| Progress_Percentage | Calculated: `(Progress / Goal) * 100` |
 | Completion_Time | Timestamp when completed (if applicable) |
 | Score | Points awarded for completion |
-| Stats_Detail | Additional stat breakdown (JSON format) |
+| Stats_Detail | Per-stat breakdown from stat definitions |
+
+### How the Mod Parses Penance Data
+
+The mod hooks into Darktide's `PenanceOverviewView` (the in-game penance menu) to access achievement data. When you trigger an export:
+
+1. **Achievement list**: Retrieved from `view._achievements_by_category`, which contains all achievement IDs grouped by category
+2. **Achievement definitions**: For each ID, the mod calls `AchievementUIHelper.achievement_definition_by_id()` and `Managers.achievements:achievement_definition()` to get the penance metadata
+3. **Completion status**: `Managers.achievements:achievement_completed(player, achievement_id)` returns whether completed and the completion timestamp
+4. **Progress tracking**: `AchievementTypes[definition.type].get_progress()` returns current progress and goal values for achievements with progress tracking
+5. **Stat details**: For achievements with stat requirements, reads individual stat values via `Managers.stats.read_user_stat()`
+
+The mod requires the penance menu to be open because that's when Darktide loads achievement data into memory.
+
+### References
+
+- [Aussiemon/Darktide-Source-Code](https://github.com/Aussiemon/Darktide-Source-Code) - Community-maintained repository of extracted Darktide Lua scripts. The achievement system code is in:
+  - `scripts/managers/achievements/` - Achievement manager and types
+  - `scripts/managers/achievements/utility/achievement_ui_helper.lua` - UI helper functions
+  - `scripts/settings/achievements/` - Achievement categories and definitions
+- [Darktide Mod Framework (DMF)](https://dmf-docs.darkti.de/) - Documentation for the mod framework used by penance_exporter
 
 ---
 
