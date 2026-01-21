@@ -4,6 +4,7 @@
 #     "altair==6.0.0",
 #     "marimo",
 #     "pandas==2.3.3",
+#     "pyfiglet",
 #     "pyarrow",
 # ]
 # [tool.marimo.display]

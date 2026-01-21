@@ -55,15 +55,150 @@ def main():
         shutil.copytree(public_dir, output_dir / "beta" / "public", dirs_exist_ok=True)
         print(f"Copied apps/public/ to _site/apps/public/ and _site/beta/public/")
 
-    # Create root index redirect to stable
+    # Create root index with app cards
     index_html = output_dir / "index.html"
     index_html.write_text('''<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta http-equiv="refresh" content="0; url=apps/penance_hunter.html">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Penance Hunter</title>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #e0e0e0;
+      background-color: #1a1a1a;
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    header {
+      background-color: #2a2a2a;
+      padding: 30px 20px;
+      text-align: center;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #8b0000;
+    }
+    h1 {
+      font-family: 'UnifrakturCook', serif;
+      font-size: 42px;
+      margin-bottom: 10px;
+      color: #c9a227;
+    }
+    .subtitle {
+      font-size: 16px;
+      color: #888;
+      margin: 0 auto;
+    }
+    .section-title {
+      font-size: 20px;
+      margin: 20px 0 10px;
+      text-align: center;
+      color: #c9a227;
+    }
+    .cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin: 20px 0;
+      justify-content: center;
+    }
+    .card {
+      background-color: #2a2a2a;
+      border: 1px solid #444;
+      flex: 1 0 300px;
+      max-width: 350px;
+    }
+    .card-header {
+      background-color: #3a3a3a;
+      padding: 15px;
+      font-weight: bold;
+      font-size: 18px;
+      color: #e0e0e0;
+      border-bottom: 1px solid #444;
+    }
+    .card-body {
+      padding: 20px;
+    }
+    .card-description {
+      color: #888;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+    .card-link {
+      display: inline-block;
+      background-color: #8b0000;
+      color: white;
+      padding: 10px 20px;
+      text-decoration: none;
+      font-weight: bold;
+      transition: background-color 0.2s;
+    }
+    .card-link:hover {
+      background-color: #a50000;
+    }
+    .card-link.beta {
+      background-color: #c9a227;
+      color: #1a1a1a;
+    }
+    .card-link.beta:hover {
+      background-color: #ddb52f;
+    }
+    footer {
+      background-color: #2a2a2a;
+      text-align: center;
+      padding: 20px 0;
+      margin-top: 40px;
+      border-top: 1px solid #444;
+    }
+    footer p {
+      color: #666;
+      font-size: 14px;
+    }
+    footer a {
+      color: #c9a227;
+      text-decoration: none;
+    }
+  </style>
 </head>
 <body>
-    <p>Redirecting to <a href="apps/penance_hunter.html">Penance Hunter</a>...</p>
+  <header>
+    <div class="container">
+      <h1>Penance Hunter</h1>
+      <p class="subtitle">Track your Darktide penance progress</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <h2 class="section-title">Apps</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">Penance Hunter</div>
+        <div class="card-body">
+          <p class="card-description">Stable release - view and track your penance completion progress.</p>
+          <a href="apps/penance_hunter.html" class="card-link">Open App</a>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Penance Hunter (Beta)</div>
+        <div class="card-body">
+          <p class="card-description">Beta version with new features - sidebar, operatives stats, and class charts.</p>
+          <a href="beta/penance_hunter.html" class="card-link beta">Open Beta</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>Built with <a href="https://marimo.io" target="_blank">marimo</a></p>
+    </div>
+  </footer>
 </body>
 </html>
 ''')
