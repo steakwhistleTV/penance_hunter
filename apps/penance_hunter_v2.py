@@ -64,7 +64,7 @@ def _(mo):
                 orientation="vertical",
             ),
         ],
-        footer=mo.md("_For the Emperor!_"),
+        footer=mo.md("_Don't ever say N**gle..._"),
     )
     return
 
@@ -206,6 +206,7 @@ def _(account_meta, completed_df, export_timestamp, mo, penances_df):
 
     # Operatives list
     all_chars = account_meta.get('all_characters', [])
+
     if all_chars:
         import re as _re
         _class_mapping = {
@@ -232,7 +233,7 @@ def _(account_meta, completed_df, export_timestamp, mo, penances_df):
                 _char_stats.append(mo.stat(label=display_cls, caption=caption, value=name, bordered=True))
             else:
                 _char_stats.append(mo.stat(label="Unknown", value=char, bordered=True))
-        _char_section = mo.accordion({"::lucide:users:: Operatives": mo.hstack(_char_stats, wrap=True)})
+        _char_section = mo.accordion({"::lucide:users:: Operatives": mo.hstack(_char_stats, widths="equal", align="center")})
     else:
         _char_section = None
 
@@ -322,7 +323,7 @@ def _(alt, completed_df, mo, pd):
     return
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(mo, penances_df):
     # Class mapping for table
     _class_mapping = {
@@ -347,18 +348,34 @@ def _(mo, penances_df):
     table_df['Penance_Class'] = table_df['Achievement_ID'].apply(_extract_class)
     table_df = table_df.sort_values(by='PROGRESS_DIFF', ascending=True)
 
-    # Progress table with formatting
-    def progress_bar(v):
+    # Create calculated columns for progress display
+    def _make_progress_bar(v):
         if isinstance(v, str):
             v = float(v.rstrip("%")) / 100.0
-        blocks = int(v * 10)
-        return f"{v*100:.0f}% " + "█" * blocks + "░" * (10 - blocks)
+        # Cap progress bar at 100% visually
+        display_v = min(v, 1.0)
+        blocks = int(display_v * 10)
+        return "█" * blocks + "░" * (10 - blocks)
 
+    def _format_percentage(v):
+        if isinstance(v, str):
+            v = float(v.rstrip("%")) / 100.0
+        return f"{v*100:.0f}%"
+
+    table_df['PROGRESS'] = table_df['Progress_Percentage'].apply(_format_percentage)
+    table_df['PROGRESS_BAR'] = table_df['Progress_Percentage'].apply(_make_progress_bar)
+
+    # Style function for percentage and bar coloring
     def style_progress(row_id, column_name, value):
-        if column_name != "Progress_Percentage":
+        if column_name not in ("PROGRESS", "PROGRESS_BAR"):
             return {}
         if isinstance(value, str):
-            value = float(value.rstrip("%")) / 100.0
+            # Handle percentage string or bar string
+            if "%" in value:
+                value = float(value.rstrip("%")) / 100.0
+            else:
+                # For bar, count filled blocks (█) out of 10
+                value = value.count("█") / 10.0
         if value >= 0.8:
             return {"color": "#22c55e"}
         elif value >= 0.5:
@@ -366,12 +383,11 @@ def _(mo, penances_df):
         else:
             return {"color": "#ef4444"}
 
-    _display_cols = ["Title", "Description", "Penance_Class", "Progress", "Goal", "Progress_Percentage", "Status"]
+    _display_cols = ["Title", "Description", "Score", "Penance_Class", "Status", "Progress", "Goal", "PROGRESS", "PROGRESS_BAR", "Category", "Achievement_ID"]
     _table_df = table_df[_display_cols].reset_index(drop=True)
 
     penance_table = mo.ui.table(
         _table_df,
-        format_mapping={"Progress_Percentage": progress_bar},
         style_cell=style_progress,
         page_size=15,
         selection="multi",

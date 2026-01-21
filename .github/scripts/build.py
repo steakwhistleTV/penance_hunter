@@ -17,7 +17,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Export the app (outputs to _site/apps/penance_hunter.html)
-    notebook_path = Path("apps/penance_hunter.py")
+    notebook_path = Path("apps/penance_hunter_v2.py")
     output_file = output_dir / "apps" / "penance_hunter.html"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
