@@ -234,9 +234,12 @@ def _(account_meta, completed_df, export_timestamp, mo, penances_df):
                 _char_stats.append(mo.stat(label=display_cls, caption=caption, value=name, bordered=True))
             else:
                 _char_stats.append(mo.stat(label="Unknown", value=char, bordered=True))
-        _char_section = mo.accordion({"::lucide:users:: Operatives": mo.hstack(_char_stats, widths="equal", align="center")})
+        _operatives_section = mo.vstack([
+            mo.md("#### ::lucide:users:: Operatives"),
+            mo.hstack(_char_stats, widths="equal", align="center")
+        ])
     else:
-        _char_section = None
+        _operatives_section = None
 
     _header = mo.md(f"### **{account_name}** - exported by {character_name}")
 
@@ -245,10 +248,130 @@ def _(account_meta, completed_df, export_timestamp, mo, penances_df):
         mo.hstack(_stats, widths="equal", align="center"),
         mo.hstack(_time_stats, widths="equal", align="center"),
     ]
-    if _char_section:
-        _content.append(_char_section)
+    if _operatives_section:
+        _content.append(_operatives_section)
 
     mo.vstack(_content)
+    return
+
+
+@app.cell
+def _(mo, penances_df):
+    # Create dataframes per in-game mapped category
+    _class_mapping = {
+        'veteran': 'Veteran',
+        'zealot': 'Zealot',
+        'zelot': 'Zealot',
+        'psyker': 'Psyker',
+        'ogryn': 'Ogryn',
+        'adamant': 'Arbitrator',
+        'broker': 'Hive Scum'
+    }
+
+    def _extract_class(achievement_id):
+        achievement_id_lower = achievement_id.lower()
+        for class_key, class_value in _class_mapping.items():
+            if class_key in achievement_id_lower:
+                return class_value
+        return 'Unknown'
+
+    # 1. Account Penances
+    account_df = penances_df[penances_df['Category'].isin(['loc_achievement_category_account_label'])]
+    account_completed = len(account_df[account_df['Status'] == 'Completed'])
+    account_total = len(account_df)
+
+    # 2. Class Penances
+    class_df = penances_df[penances_df['Category'].isin(['loc_class_abilities_title', 'loc_class_progression_title'])].copy()
+    class_df['Penance_Class'] = class_df['Achievement_ID'].apply(_extract_class)
+    class_summary = class_df.groupby('Penance_Class')['Status'].agg(
+        total='size',
+        completed=lambda s: (s == 'Completed').sum()
+    ).astype({'total': int, 'completed': int})
+    class_summary['pct'] = (class_summary['completed'] / class_summary['total'] * 100).round(0).astype(int)
+
+    # 3. Tactical Penances
+    tactical_df = penances_df[penances_df['Category'].isin([
+        'loc_achievement_category_offensive_label',
+        'loc_achievement_category_defensive_label',
+        'loc_achievement_category_teamplay_label'
+    ])]
+    tactical_completed = len(tactical_df[tactical_df['Status'] == 'Completed'])
+    tactical_in_progress = len(tactical_df[tactical_df['Status'] == 'In Progress'])
+
+    # 4. Heretical Penances
+    heretical_df = penances_df[penances_df['Category'].isin(['loc_achievement_category_heretics_label'])]
+    heretical_completed = len(heretical_df[heretical_df['Status'] == 'Completed'])
+
+    # 5. Missions Penances
+    missions_df = penances_df[penances_df['Category'].isin([
+        'loc_achievement_subcategory_missions_general_label',
+        'loc_achievement_subcategory_missions_auric_label',
+        'loc_achievement_subcategory_missions_havoc_label',
+        'loc_achievement_subcategory_missions_survival_label'
+    ])]
+    missions_completed = len(missions_df[missions_df['Status'] == 'Completed'])
+    missions_in_progress = len(missions_df[missions_df['Status'] == 'In Progress'])
+
+    # 6. Exploration Penances
+    exploration_terms = ['group_mission_zone_wide', 'collectible', 'destructible', 'mission_zone_',
+                         'mission_scavenge_samples', 'mission_propaganda_fan_kills', 'mission_raid_bottles']
+    exploration_regex = '|'.join(exploration_terms)
+    exploration_df = penances_df[
+        (penances_df['Achievement_ID'].str.contains(exploration_regex, case=False, na=False)) |
+        (penances_df['Category'].isin(['loc_achievement_subcategory_twins_mission_label']))
+    ]
+    exploration_completed = len(exploration_df[exploration_df['Status'] == 'Completed'])
+
+    # 7. Endeavours Penances (leftover)
+    excluded_categories = [
+        'loc_class_abilities_title', 'loc_class_progression_title',
+        'loc_achievement_category_account_label',
+        'loc_achievement_category_offensive_label', 'loc_achievement_category_defensive_label',
+        'loc_achievement_category_teamplay_label', 'loc_achievement_category_heretics_label',
+        'loc_achievement_subcategory_missions_general_label', 'loc_achievement_subcategory_missions_auric_label',
+        'loc_achievement_subcategory_missions_havoc_label', 'loc_achievement_subcategory_missions_survival_label',
+        'loc_achievement_subcategory_twins_mission_label',
+        'loc_weapon_progression_mastery', 'loc_achievement_category_weapons_label'
+    ]
+    leftover_df = penances_df[~penances_df['Category'].isin(excluded_categories)]
+    leftover_df = leftover_df[~leftover_df['Achievement_ID'].str.contains(exploration_regex, case=False, na=False)]
+    endeavours_completed = len(leftover_df[leftover_df['Status'] == 'Completed'])
+
+    # 8. Weapons Penances
+    weapons_df = penances_df[penances_df['Category'].isin([
+        'loc_weapon_progression_mastery', 'loc_achievement_category_weapons_label'
+    ])]
+    weapons_completed = len(weapons_df[weapons_df['Status'] == 'Completed'])
+
+    # All categories in one row
+    _cat_stats = [
+        mo.stat(label="Account", value=f"{account_completed}", caption="Completed", bordered=True),
+        mo.stat(label="Tactical", value=f"{tactical_completed}", caption=f"{tactical_in_progress} in progress" if tactical_in_progress else "Completed", bordered=True),
+        mo.stat(label="Heretical", value=f"{heretical_completed}", caption="Completed", bordered=True),
+        mo.stat(label="Missions", value=f"{missions_completed}", caption=f"{missions_in_progress} in progress" if missions_in_progress else "Completed", bordered=True),
+        mo.stat(label="Exploration", value=f"{exploration_completed}", caption="Completed", bordered=True),
+        mo.stat(label="Endeavours", value=f"{endeavours_completed}", caption="Completed", bordered=True),
+        mo.stat(label="Weapons", value=f"{weapons_completed}", caption="Completed", bordered=True),
+    ]
+
+    # Class penances per class
+    _class_stats = []
+    for _cls in ['Arbitrator', 'Hive Scum', 'Ogryn', 'Psyker', 'Veteran', 'Zealot']:
+        if _cls in class_summary.index:
+            _row = class_summary.loc[_cls]
+            _class_stats.append(mo.stat(
+                label=_cls,
+                value=f"{int(_row['completed'])}/{int(_row['total'])}",
+                caption=f"{int(_row['pct'])}%",
+                bordered=True
+            ))
+
+    mo.vstack([
+        mo.md("#### ::lucide:trophy:: Categories"),
+        mo.hstack(_cat_stats, widths="equal", align="center"),
+        mo.md("##### Class Penances"),
+        mo.hstack(_class_stats, widths="equal", align="center"),
+    ])
     return
 
 
@@ -344,16 +467,47 @@ def _(mo, penances_df):
                 return class_value
         return 'General'
 
-    # Add class column to dataframe
+    # Add class column and Penance_Category to dataframe
     table_df = penances_df.copy()
     table_df['Penance_Class'] = table_df['Achievement_ID'].apply(_extract_class)
+
+    # Map raw Category to friendly category names
+    _category_map = {
+        'loc_achievement_category_account_label': 'Account',
+        'loc_class_abilities_title': 'Class',
+        'loc_class_progression_title': 'Class',
+        'loc_achievement_category_offensive_label': 'Tactical',
+        'loc_achievement_category_defensive_label': 'Tactical',
+        'loc_achievement_category_teamplay_label': 'Tactical',
+        'loc_achievement_category_heretics_label': 'Heretical',
+        'loc_achievement_subcategory_missions_general_label': 'Missions - General',
+        'loc_achievement_subcategory_missions_auric_label': 'Missions - General',
+        'loc_achievement_subcategory_missions_havoc_label': 'Missions - Havoc',
+        'loc_achievement_subcategory_missions_survival_label': 'Missions - General',
+        'loc_achievement_subcategory_twins_mission_label': 'Exploration',
+        'loc_weapon_progression_mastery': 'Weapons',
+        'loc_achievement_category_weapons_label': 'Weapons',
+    }
+
+    # Exploration detection via Achievement_ID patterns
+    _exploration_terms = ['group_mission_zone_wide', 'collectible', 'destructible', 'mission_zone_',
+                          'mission_scavenge_samples', 'mission_propaganda_fan_kills', 'mission_raid_bottles']
+    _exploration_regex = '|'.join(_exploration_terms)
+
+    def _map_category(row):
+        if row['Category'] in _category_map:
+            return _category_map[row['Category']]
+        if row['Achievement_ID'] and any(term in row['Achievement_ID'].lower() for term in _exploration_terms):
+            return 'Exploration'
+        return 'Endeavours'
+
+    table_df['Penance_Category'] = table_df.apply(_map_category, axis=1)
     table_df = table_df.sort_values(by='PROGRESS_DIFF', ascending=True)
 
     # Create calculated columns for progress display
     def _make_progress_bar(v):
         if isinstance(v, str):
             v = float(v.rstrip("%")) / 100.0
-        # Cap progress bar at 100% visually
         display_v = min(v, 1.0)
         blocks = int(display_v * 10)
         return "█" * blocks + "░" * (10 - blocks)
@@ -366,16 +520,61 @@ def _(mo, penances_df):
     table_df['PROGRESS'] = table_df['Progress_Percentage'].apply(_format_percentage)
     table_df['PROGRESS_BAR'] = table_df['Progress_Percentage'].apply(_make_progress_bar)
 
+    # Count in-progress penances per category and class
+    _in_progress_df = table_df[table_df['Status'] == 'In Progress']
+    _cat_counts = _in_progress_df['Penance_Category'].value_counts().to_dict()
+    _class_counts = _in_progress_df['Penance_Class'].value_counts().to_dict()
+    _total_in_progress = len(_in_progress_df)
+
+    # Filter dropdowns with counts
+    status_filter = mo.ui.dropdown(
+        options=["All", "In Progress", "Completed"],
+        value="All",
+        label="Status"
+    )
+
+    _categories = ["Account", "Class", "Tactical", "Heretical", "Missions - General", "Missions - Havoc", "Exploration", "Endeavours", "Weapons"]
+    _category_options = {"All": "All"} | {f"{cat} ({_cat_counts.get(cat, 0)})": cat for cat in _categories}
+    category_filter = mo.ui.dropdown(
+        options=_category_options,
+        value="All",
+        label="Category"
+    )
+
+    _classes = ["General", "Arbitrator", "Hive Scum", "Ogryn", "Psyker", "Veteran", "Zealot"]
+    _class_options = {"All": "All"} | {f"{cls} ({_class_counts.get(cls, 0)})": cls for cls in _classes}
+    class_filter = mo.ui.dropdown(
+        options=_class_options,
+        value="All",
+        label="Class"
+    )
+
+    mo.hstack([status_filter, category_filter, class_filter], justify="start", gap=1)
+    return category_filter, class_filter, status_filter, table_df
+
+
+@app.cell(hide_code=True)
+def _(category_filter, class_filter, mo, status_filter, table_df):
+    # Apply filters
+    filtered_df = table_df.copy()
+
+    if status_filter.value != "All":
+        filtered_df = filtered_df[filtered_df['Status'] == status_filter.value]
+
+    if category_filter.value != "All":
+        filtered_df = filtered_df[filtered_df['Penance_Category'] == category_filter.value]
+
+    if class_filter.value != "All":
+        filtered_df = filtered_df[filtered_df['Penance_Class'] == class_filter.value]
+
     # Style function for percentage and bar coloring
-    def style_progress(row_id, column_name, value):
+    def _style_progress(row_id, column_name, value):
         if column_name not in ("PROGRESS", "PROGRESS_BAR"):
             return {}
         if isinstance(value, str):
-            # Handle percentage string or bar string
             if "%" in value:
                 value = float(value.rstrip("%")) / 100.0
             else:
-                # For bar, count filled blocks (█) out of 10
                 value = value.count("█") / 10.0
         if value >= 0.8:
             return {"color": "#22c55e"}
@@ -384,45 +583,34 @@ def _(mo, penances_df):
         else:
             return {"color": "#ef4444"}
 
-    _display_cols = ["Title", "Description", "Score", "Penance_Class", "Status", "Progress", "Goal", "PROGRESS", "PROGRESS_BAR", "Category", "Achievement_ID"]
-    _table_df = table_df[_display_cols].reset_index(drop=True)
+    _display_cols = ["Title", "Description", "Score", "Penance_Class", "Penance_Category", "Status", "Progress", "Goal", "PROGRESS", "PROGRESS_BAR"]
+    _filtered_display = filtered_df[_display_cols].reset_index(drop=True)
 
     penance_table = mo.ui.table(
-        _table_df,
-        style_cell=style_progress,
+        _filtered_display,
+        style_cell=_style_progress,
         page_size=15,
         selection="multi",
         wrapped_columns=['Description']
     )
-
-    mo.vstack([
-        mo.md("### ::lucide:list:: Penance List"),
-        penance_table,
-    ])
     return (penance_table,)
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(mo, pd, penance_table):
     # Selected penances tracker
     selected = penance_table.value
 
     if selected is not None and isinstance(selected, pd.DataFrame) and len(selected) > 0:
-        _selected_count = len(selected)
-        _selected_progress = selected['Progress'].sum()
-        _selected_goal = selected['Goal'].sum()
-        _selected_pct = round(_selected_progress / _selected_goal * 100, 1) if _selected_goal > 0 else 0
-
-        mo.vstack([
-            mo.md(f"### ::lucide:target:: Tracked ({_selected_count} selected)"),
-            mo.hstack([
-                mo.stat(label="Combined Progress", value=f"{_selected_progress}/{_selected_goal}", bordered=True),
-                mo.stat(label="Combined %", value=f"{_selected_pct}%", bordered=True),
-            ], widths="equal"),
-            mo.ui.table(selected, page_size=10),
-        ])
+        _tracked_content = mo.ui.table(selected, page_size=10)
     else:
-        mo.md("_Select penances from the table above to track them here._").callout(kind="info")
+        _tracked_content = mo.md("_Select penances from the Penance List tab to track them here._").callout(kind="info")
+
+    # Tabs
+    mo.ui.tabs({
+        "::lucide:list:: Penance List": penance_table,
+        f"::lucide:target:: Tracked ({len(selected) if selected is not None and isinstance(selected, pd.DataFrame) else 0})": _tracked_content,
+    })
     return
 
 
