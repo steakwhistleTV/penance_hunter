@@ -70,11 +70,14 @@ The exported CSV filename includes your account ID and timestamp, e.g.:
 
 The web app provides:
 
-- **Account overview** - Total completion, account level, true level, prestige
-- **Operatives display** - All your characters with their levels
+- **Account overview** - Total completion, account level, true level, account prestige, export timestamp with timezone
+- **Operatives display** - All your characters with their levels and individual prestige
 - **Category breakdown** - Progress across Account, Class, Tactical, Heretical, Missions, Exploration, Endeavours, and Weapons penances
 - **Class penances** - Per-class completion stats (Veteran, Zealot, Psyker, Ogryn, Arbitrator, Hive Scum)
-- **Progress chart** - Visualize your penance completion over time by class
+- **Progress chart** - Visualize your penance completion over time by class with:
+  - Class filter (multiselect to show/hide specific classes)
+  - Date range filter (start/end dates with "End at Now" option)
+  - Stats cards showing first/last completion in range, count, and total score
 - **Filterable penance list** - Filter by status, category, and class
 - **Tracking** - Select penances to track in a separate tab
 
@@ -88,6 +91,22 @@ The web app provides:
 ## CSV Export Format
 
 The exported CSV includes metadata in comments at the top (account info, character list, export stats) followed by penance data.
+
+### Header Metadata (Comments)
+
+The CSV header contains account-level metadata as comments:
+
+| Field | Description |
+|-------|-------------|
+| Mod Version | Version of penance_exporter that created the file |
+| Account | Account display name |
+| Account ID | Unique account identifier |
+| Account Level | Sum of all character base levels |
+| Account True Level | Sum of all character true levels (includes prestige) |
+| Account Prestige | Sum of all character prestiges |
+| All Characters | List of all characters with name, class, level, true level, and prestige |
+| Export Character | Name of the character used to export |
+| Export Timezone | Local timezone offset (e.g., `-0500`) |
 
 ### CSV Export Fields
 
