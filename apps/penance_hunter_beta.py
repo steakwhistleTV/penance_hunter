@@ -379,16 +379,16 @@ def _(mo, penances_df):
     mo.vstack([
         mo.md("#### ::lucide:trophy:: Categories"),
         mo.hstack(_cat_stats, widths="equal", align="center"),
-        mo.md("##### Class Penances"),
+        mo.md("##### ::lucide:swords:: Class Penances"),
         mo.hstack(_class_stats, widths="equal", align="center"),
     ])
     return
 
 
 @app.cell(hide_code=True)
-def _(alt, completed_df, mo, pd):
+def _(completed_df, mo, pd):
     # Class mapping for extracting class from Achievement_ID
-    class_mapping = {
+    _class_mapping = {
         'veteran': 'Veteran',
         'zealot': 'Zealot',
         'zelot': 'Zealot',
@@ -398,62 +398,161 @@ def _(alt, completed_df, mo, pd):
         'broker': 'Hive Scum'
     }
 
-    def extract_class(achievement_id):
+    def _extract_class(achievement_id):
         achievement_id_lower = achievement_id.lower()
-        for class_key, class_value in class_mapping.items():
+        for class_key, class_value in _class_mapping.items():
             if class_key in achievement_id_lower:
                 return class_value
         return 'General'
 
-    # Add class to completed penances
-    chart_df = completed_df.copy()
-    chart_df['Penance_Class'] = chart_df['Achievement_ID'].apply(extract_class)
+    # Prepare chart data with class info
+    chart_base_df = completed_df.copy()
+    chart_base_df['Penance_Class'] = chart_base_df['Achievement_ID'].apply(_extract_class)
+
+    # Get date range from data
+    min_date = chart_base_df['Completion_Time'].min()
+    max_date = chart_base_df['Completion_Time'].max()
+
+    # Class filter - multiselect
+    available_classes = ['General', 'Arbitrator', 'Hive Scum', 'Ogryn', 'Psyker', 'Veteran', 'Zealot']
+    chart_class_filter = mo.ui.multiselect(
+        options=available_classes,
+        value=available_classes,
+        label="Classes"
+    )
+
+    # Date range filters
+    chart_start_date = mo.ui.date(
+        value=min_date.date() if pd.notna(min_date) else None,
+        label="Start Date"
+    )
+
+    chart_end_date = mo.ui.date(
+        value=max_date.date() if pd.notna(max_date) else None,
+        label="End Date"
+    )
+
+    chart_use_now = mo.ui.checkbox(label="End at Now", value=False)
+
+    mo.vstack([
+        mo.md("#### ::lucide:chart-line:: Penance Progress Chart"),
+        mo.hstack([
+            chart_class_filter,
+            chart_start_date,
+            chart_end_date,
+            chart_use_now
+        ], justify="start", gap=1)
+    ])
+    return (
+        chart_base_df,
+        chart_class_filter,
+        chart_end_date,
+        chart_start_date,
+        chart_use_now,
+    )
+
+
+@app.cell(hide_code=True)
+def _(
+    alt,
+    chart_base_df,
+    chart_class_filter,
+    chart_end_date,
+    chart_start_date,
+    chart_use_now,
+    mo,
+    pd,
+):
+    # Apply filters
+    filtered_chart_df = chart_base_df.copy()
+
+    # Filter by selected classes
+    if chart_class_filter.value:
+        filtered_chart_df = filtered_chart_df[filtered_chart_df['Penance_Class'].isin(chart_class_filter.value)]
+
+    # Filter by date range
+    if chart_start_date.value:
+        start_dt = pd.Timestamp(chart_start_date.value)
+        filtered_chart_df = filtered_chart_df[filtered_chart_df['Completion_Time'] >= start_dt]
+
+    if chart_use_now.value:
+        end_dt = pd.Timestamp.now()
+    elif chart_end_date.value:
+        end_dt = pd.Timestamp(chart_end_date.value) + pd.Timedelta(days=1)  # Include full end day
+    else:
+        end_dt = None
+
+    if end_dt:
+        filtered_chart_df = filtered_chart_df[filtered_chart_df['Completion_Time'] <= end_dt]
 
     # Sort by completion time and calculate cumulative count per class
-    chart_df = chart_df.sort_values('Completion_Time')
-    chart_df['CCOUNT_PER_CLASS'] = chart_df.groupby('Penance_Class').cumcount() + 1
+    filtered_chart_df = filtered_chart_df.sort_values('Completion_Time')
+    filtered_chart_df['CCOUNT_PER_CLASS'] = filtered_chart_df.groupby('Penance_Class').cumcount() + 1
 
     # Get last point for each class (for endpoint markers)
-    last_points = chart_df.groupby('Penance_Class').last().reset_index()
+    last_points = filtered_chart_df.groupby('Penance_Class').last().reset_index()
 
-    # Extend x-axis slightly past last completion
-    current_date = pd.Timestamp.now() + pd.Timedelta(days=5)
+    # Determine x-axis domain
+    if len(filtered_chart_df) > 0:
+        x_min = filtered_chart_df['Completion_Time'].min()
+        x_max = pd.Timestamp.now() + pd.Timedelta(days=5) if chart_use_now.value else (end_dt + pd.Timedelta(days=5) if end_dt else pd.Timestamp.now() + pd.Timedelta(days=5))
 
-    # Line chart for progression
-    line_chart = alt.Chart(chart_df).mark_line(point=True).encode(
-        x=alt.X('Completion_Time:T', title='Date', scale=alt.Scale(domain=[chart_df['Completion_Time'].min(), current_date])),
-        y=alt.Y('CCOUNT_PER_CLASS:Q', title='Penances Completed'),
-        color=alt.Color('Penance_Class:N', title='Class'),
-        tooltip=[
-            alt.Tooltip('Penance_Class:N', title='Class'),
-            alt.Tooltip('Completion_Time:T', title='Date'),
-            alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for Class'),
-            alt.Tooltip('Title:N', title='Penance')
-        ]
-    )
+        # Line chart for progression
+        line_chart = alt.Chart(filtered_chart_df).mark_line(point=True).encode(
+            x=alt.X('Completion_Time:T', title='Date', scale=alt.Scale(domain=[x_min, x_max])),
+            y=alt.Y('CCOUNT_PER_CLASS:Q', title='Penances Completed'),
+            color=alt.Color('Penance_Class:N', title='Class'),
+            tooltip=[
+                alt.Tooltip('Penance_Class:N', title='Class'),
+                alt.Tooltip('Completion_Time:T', title='Date'),
+                alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for Class'),
+                alt.Tooltip('Title:N', title='Penance')
+            ]
+        )
 
-    # Endpoint markers
-    last_points_chart = alt.Chart(last_points).mark_point(size=200, filled=True).encode(
-        x=alt.X('Completion_Time:T', scale=alt.Scale(domain=[chart_df['Completion_Time'].min(), current_date])),
-        y=alt.Y('CCOUNT_PER_CLASS:Q'),
-        color=alt.Color('Penance_Class:N', title='Class'),
-        tooltip=[
-            alt.Tooltip('Penance_Class:N', title='Class'),
-            alt.Tooltip('Completion_Time:T', title='Date'),
-            alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for Class')
-        ]
-    )
+        # Endpoint markers
+        last_points_chart = alt.Chart(last_points).mark_point(size=200, filled=True).encode(
+            x=alt.X('Completion_Time:T', scale=alt.Scale(domain=[x_min, x_max])),
+            y=alt.Y('CCOUNT_PER_CLASS:Q'),
+            color=alt.Color('Penance_Class:N', title='Class'),
+            tooltip=[
+                alt.Tooltip('Penance_Class:N', title='Class'),
+                alt.Tooltip('Completion_Time:T', title='Date'),
+                alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for Class')
+            ]
+        )
 
-    # Layer together
-    class_progression_chart = (
-        line_chart + last_points_chart
-    ).properties(
-        width="container",
-        height=400,
-        title="Operative Penance Progress by Class"
-    ).interactive()
+        # Layer together
+        class_progression_chart = (
+            line_chart + last_points_chart
+        ).properties(
+            width="container",
+            height=400,
+            title="Operative Penance Progress by Class"
+        ).interactive()
 
-    mo.ui.altair_chart(class_progression_chart, chart_selection=False)
+        _chart_output = mo.ui.altair_chart(class_progression_chart, chart_selection=False)
+
+        # Stats for filtered data
+        first_penance_time = filtered_chart_df['Completion_Time'].min()
+        last_penance_time = filtered_chart_df['Completion_Time'].max()
+        total_completed_in_range = len(filtered_chart_df)
+        total_score_in_range = filtered_chart_df['Score'].sum() if 'Score' in filtered_chart_df.columns else 0
+
+        first_str = first_penance_time.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(first_penance_time) else "N/A"
+        last_str = last_penance_time.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(last_penance_time) else "N/A"
+
+        _chart_stats = mo.hstack([
+            mo.stat(label="First in Range", value=first_str, bordered=True),
+            mo.stat(label="Last in Range", value=last_str, bordered=True),
+            mo.stat(label="Completed in Range", value=str(total_completed_in_range), bordered=True),
+            mo.stat(label="Total Score", value=str(total_score_in_range), bordered=True),
+        ], widths="equal", align="center")
+    else:
+        _chart_output = mo.md("_No data matches the selected filters._").callout(kind="warn")
+        _chart_stats = None
+
+    mo.vstack([_chart_output, _chart_stats] if _chart_stats else [_chart_output])
     return
 
 
@@ -559,7 +658,10 @@ def _(mo, penances_df):
         label="Class"
     )
 
-    mo.hstack([status_filter, category_filter, class_filter], justify="start", gap=1)
+    mo.vstack([
+        mo.md("#### ::lucide:table:: Penance Data"),
+        mo.hstack([status_filter, category_filter, class_filter], justify="start", gap=1)
+    ])
     return category_filter, class_filter, status_filter, table_df
 
 
