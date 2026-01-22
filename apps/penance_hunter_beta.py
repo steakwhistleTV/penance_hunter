@@ -266,7 +266,7 @@ def _(account_meta, completed_df, export_timestamp, mo, penances_df):
 
 
 @app.cell
-def _(is_wasm, mo, penances_df):
+def _(mo, penances_df):
     # Create dataframes per in-game mapped category
     _class_mapping = {
         'veteran': 'Veteran',
@@ -364,31 +364,14 @@ def _(is_wasm, mo, penances_df):
         mo.stat(label="Weapons", value=f"{weapons_completed}", caption="Completed", bordered=True),
     ]
 
-    # Class penances per class with icons (base64 encoded for browser compatibility)
-    import base64
-    _icons_path = mo.notebook_location() / "public" / "icons"
-
-    def _load_icon(icon_name):
-        icon_path = _icons_path / f'{icon_name}.png'
-        try:
-            if is_wasm():
-                # In WASM, use the path directly as URL - browser fetches it
-                return str(icon_path)
-            else:
-                # Locally, base64 encode for embedded display
-                with open(icon_path, 'rb') as f:
-                    return f'data:image/png;base64,{base64.b64encode(f.read()).decode()}'
-        except Exception as e:
-            print(f"Failed to load icon {icon_name}: {e}")
-            return ''
-
+    # Class penances per class with icons
     _class_icons = {
-        'Veteran': _load_icon('veteran'),
-        'Zealot': _load_icon('zealot'),
-        'Psyker': _load_icon('psyker'),
-        'Ogryn': _load_icon('ogryn'),
-        'Arbitrator': _load_icon('arbitrator'),
-        'Hive Scum': _load_icon('hive_scum'),
+        'Veteran': 'public/icons/veteran.png',
+        'Zealot': 'public/icons/zealot.png',
+        'Psyker': 'public/icons/psyker.png',
+        'Ogryn': 'public/icons/ogryn.png',
+        'Arbitrator': 'public/icons/arbitrator.png',
+        'Hive Scum': 'public/icons/hive_scum.png',
     }
 
     _class_stats = []
