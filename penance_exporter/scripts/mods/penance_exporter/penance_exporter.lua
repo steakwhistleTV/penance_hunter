@@ -3,7 +3,7 @@ local mod = get_mod("penance_exporter")
 local DMF = get_mod("DMF")
 
 -- Version info
-local MOD_VERSION = "2.2.2"
+local MOD_VERSION = "2.3.1"
 
 -- File I/O setup (borrowed from Scrivener pattern)
 local io_lib = DMF:persistent_table("_io")
@@ -377,8 +377,9 @@ local function export_penances_csv()
     -- Get character level
     local character_level = character_profile.current_level or "Unknown"
 
-    -- Get export timestamp
+    -- Get export timestamp with timezone
     local export_date = os_lib.date("%Y-%m-%d %H:%M:%S")
+    local timezone_offset = os_lib.date("%z") -- e.g., "-0500" or "+0100"
 
     -- Use echo with localization key and format args separately
     mod:info("Starting penance export for " .. character_name .. " (" .. archetype_name .. ")...")
@@ -517,6 +518,7 @@ local function export_penances_csv()
             end
             local account_level = 0
             local account_true_level = 0
+            local account_prestige = 0
             local all_characters = {}
 
             -- Find current character and calculate levels for all characters
@@ -528,9 +530,11 @@ local function export_penances_csv()
                 local char_xp = char_data.currentXp or 0
                 local char_true_level, char_additional, char_prestige = calculate_true_level(char_level, char_xp, xp_settings)
                 char_true_level = char_true_level or char_level
+                char_prestige = char_prestige or 0
 
                 account_level = account_level + char_level
                 account_true_level = account_true_level + char_true_level
+                account_prestige = account_prestige + char_prestige
 
                 -- Get character name and archetype from profile
                 local char_profile = profile_lookup[char_data.id]
@@ -580,25 +584,25 @@ local function export_penances_csv()
 
             -- Continue with export after getting all data
             perform_export(player, character_profile, character_name, account_name, platform, account_id,
-                archetype_name, character_level, export_date, num_characters, account_level,
-                true_level, additional_level, prestige, account_true_level, all_characters)
+                archetype_name, character_level, export_date, timezone_offset, num_characters, account_level,
+                true_level, additional_level, prestige, account_true_level, account_prestige, all_characters)
         end):catch(function(error)
             mod:info("Could not fetch account data, continuing without it...")
             -- Continue export without account data
             perform_export(player, character_profile, character_name, account_name, platform, account_id,
-                archetype_name, character_level, export_date, 0, 0, nil, nil, nil, 0, {})
+                archetype_name, character_level, export_date, timezone_offset, 0, 0, nil, nil, nil, 0, 0, {})
         end)
 
         return -- Exit early, export will continue in promise callback
     else
         -- Backend not available, continue without account data
         perform_export(player, character_profile, character_name, account_name, platform, account_id,
-            archetype_name, character_level, export_date, 0, 0, nil, nil, nil, 0, {})
+            archetype_name, character_level, export_date, timezone_offset, 0, 0, nil, nil, nil, 0, 0, {})
     end
 end
 
 -- Perform the actual export (separated to handle async account data)
-perform_export = function(player, character_profile, character_name, account_name, platform, account_id, archetype_name, character_level, export_date, num_characters, account_level, true_level, additional_level, prestige, account_true_level, all_characters)
+perform_export = function(player, character_profile, character_name, account_name, platform, account_id, archetype_name, character_level, export_date, timezone_offset, num_characters, account_level, true_level, additional_level, prestige, account_true_level, account_prestige, all_characters)
     -- CSV header with metadata columns
     local csv_lines = {
         "Export_Account,Export_Platform,Export_Character,Export_Archetype,Export_Mod_Date,Achievement_ID,Category,Icon,Title,Description,Status,Progress,Goal,Progress_Percentage,Completion_Time,Score,Stats_Detail"
@@ -735,6 +739,7 @@ perform_export = function(player, character_profile, character_name, account_nam
     if f then
         -- Write metadata header as comments
         f:write(string.format("# Darktide Penance Export\n"))
+        f:write(string.format("# Mod Version: %s\n", MOD_VERSION))
         f:write(string.format("# Account: %s\n", account_name))
         f:write(string.format("# Account ID: %s\n", tostring(account_id)))
         f:write(string.format("# Platform: %s\n", platform))
@@ -747,6 +752,9 @@ perform_export = function(player, character_profile, character_name, account_nam
         if account_true_level and account_true_level > 0 then
             f:write(string.format("# Account True Level: %d\n", account_true_level))
         end
+        if account_prestige and account_prestige > 0 then
+            f:write(string.format("# Account Prestige: %d\n", account_prestige))
+        end
         f:write(string.format("#\n"))
 
         -- List all characters
@@ -756,7 +764,7 @@ perform_export = function(player, character_profile, character_name, account_nam
             for i, char in ipairs(all_characters) do
                 local level_display = char.level
                 if char.true_level > char.level then
-                    level_display = string.format("%d (True: %d, +%d)", char.level, char.true_level, char.additional_level)
+                    level_display = string.format("%d (True: %d, Prestige: %d)", char.level, char.true_level, char.prestige)
                 end
                 f:write(string.format("#   %d. %s (%s) - Level %s\n", i, char.name, char.archetype, level_display))
                 if string.match(char.name, "^Char%-") or char.name == "Unknown" then
@@ -779,11 +787,12 @@ perform_export = function(player, character_profile, character_name, account_nam
                 f:write(string.format("# Export Additional Levels: +%d\n", additional_level))
             end
             if prestige and prestige > 0 then
-                f:write(string.format("# Export Prestige: %d\n", prestige))
+                f:write(string.format("# Export Character Prestige: %d\n", prestige))
             end
         end
         f:write(string.format("#\n"))
         f:write(string.format("# Export Date: %s\n", export_date))
+        f:write(string.format("# Export Timezone: %s\n", timezone_offset))
         f:write(string.format("# Total Penances: %d\n", total_penances))
         f:write(string.format("# Completed Penances: %d\n", completed_penances))
         f:write(string.format("# Completion Rate: %.1f%%\n", total_penances > 0 and (completed_penances / total_penances * 100) or 0))
