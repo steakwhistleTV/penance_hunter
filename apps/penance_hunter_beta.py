@@ -4,7 +4,7 @@
 #     "altair==6.0.0",
 #     "marimo",
 #     "pandas==2.3.3",
-#     "pyfiglet",
+#     "pyfiglet==1.0.4",
 #     "pyarrow",
 # ]
 # [tool.marimo.display]
@@ -148,8 +148,12 @@ def _(csv_upload, default_csv, io, is_wasm, mo, pd, re):
                     meta['account_level'] = int(line_stripped.split(':')[1].strip())
                 elif 'Account True Level:' in line_stripped:
                     meta['account_true_level'] = int(line_stripped.split(':')[1].strip())
-                elif 'Export Prestige:' in line_stripped:
+                elif 'Account Prestige:' in line_stripped:
                     meta['prestige'] = int(line_stripped.split(':')[1].strip())
+                elif 'Export Timezone:' in line_stripped:
+                    meta['timezone'] = line_stripped.split(':', 1)[1].strip()
+                elif 'Mod Version:' in line_stripped:
+                    meta['mod_version'] = line_stripped.split(':', 1)[1].strip()
         return meta
 
     account_meta = get_account_metadata(penance_export_contents)
@@ -184,10 +188,13 @@ def _(account_meta, completed_df, export_timestamp, mo, penances_df):
     earliest_completion = completed_df['Completion_Time'].min()
     latest_completion = completed_df['Completion_Time'].max()
 
-    # Format timestamps
-    export_time_str = export_timestamp.strftime('%Y-%m-%d %H:%M') if not export_timestamp != export_timestamp else "Unknown"
-    earliest_str = earliest_completion.strftime('%Y-%m-%d') if not earliest_completion != earliest_completion else "N/A"
-    latest_str = latest_completion.strftime('%Y-%m-%d') if not latest_completion != latest_completion else "N/A"
+    # Get timezone from export metadata
+    timezone_str = account_meta.get('timezone', '')
+
+    # Format timestamps with time and seconds
+    export_time_str = export_timestamp.strftime('%Y-%m-%d %H:%M:%S') if not export_timestamp != export_timestamp else "Unknown"
+    earliest_str = earliest_completion.strftime('%Y-%m-%d %H:%M:%S') if not earliest_completion != earliest_completion else "N/A"
+    latest_str = latest_completion.strftime('%Y-%m-%d %H:%M:%S') if not latest_completion != latest_completion else "N/A"
 
     # Main stats row
     _stats = [
@@ -203,6 +210,7 @@ def _(account_meta, completed_df, export_timestamp, mo, penances_df):
         mo.stat(label="Export Time", value=export_time_str, bordered=True),
         mo.stat(label="First Completion", value=earliest_str, bordered=True),
         mo.stat(label="Latest Completion", value=latest_str, bordered=True),
+        mo.stat(label="Timezone", value=timezone_str if timezone_str else "N/A", bordered=True),
     ]
 
     # Operatives list
@@ -221,14 +229,14 @@ def _(account_meta, completed_df, export_timestamp, mo, penances_df):
         }
         _char_stats = []
         for char in all_chars:
-            # Parse: "1. glowm (Zealot) - Level 30 (True: 169, +139)" or "2. Zek (Hive Scum) - Level 30"
-            char_match = _re.match(r'\d+\.\s*(.+?)\s*\(([^)]+)\)\s*-\s*Level\s*(\d+)(?:\s*\(True:\s*(\d+),\s*\+(\d+)\))?', char)
+            # Parse: "1. gern (Zealot) - Level 30 (True: 169, Prestige: 4)" or "2. Zek (Hive Scum) - Level 30"
+            char_match = _re.match(r'\d+\.\s*(.+?)\s*\(([^)]+)\)\s*-\s*Level\s*(\d+)(?:\s*\(True:\s*(\d+),\s*Prestige:\s*(\d+)\))?', char)
             if char_match:
-                name, cls, level, true_level, bonus = char_match.groups()
+                name, cls, level, true_level, prestige = char_match.groups()
                 # Map class names (adamant -> Arbitrator, broker -> Hive Scum)
                 display_cls = _class_mapping.get(cls.lower(), cls.title())
-                if true_level and bonus:
-                    caption = f"Level {level} (True: {true_level}, +{bonus})"
+                if true_level and prestige:
+                    caption = f"Level {level} (True: {true_level}, Prestige: {prestige})"
                 else:
                     caption = f"Level {level}"
                 _char_stats.append(mo.stat(label=display_cls, caption=caption, value=name, bordered=True))
@@ -241,7 +249,9 @@ def _(account_meta, completed_df, export_timestamp, mo, penances_df):
     else:
         _operatives_section = None
 
-    _header = mo.md(f"### **{account_name}** - exported by {character_name}")
+    mod_version = account_meta.get('mod_version', 'Legacy')
+    version_str = f" (v{mod_version})"
+    _header = mo.md(f"### **{account_name}** - exported by {character_name}{version_str}")
 
     _content = [
         _header,
@@ -583,7 +593,7 @@ def _(category_filter, class_filter, mo, status_filter, table_df):
         else:
             return {"color": "#ef4444"}
 
-    _display_cols = ["Title", "Description", "Score", "Penance_Class", "Penance_Category", "Status", "Progress", "Goal", "PROGRESS", "PROGRESS_BAR"]
+    _display_cols = ["Title", "Description", "Score", "Penance_Class", "Penance_Category", "Status", "Progress", "Goal", "Completion_Time", "PROGRESS", "PROGRESS_BAR"]
     _filtered_display = filtered_df[_display_cols].reset_index(drop=True)
 
     penance_table = mo.ui.table(
