@@ -368,17 +368,14 @@ def _(is_wasm, mo, penances_df):
     import base64
     _icons_path = mo.notebook_location() / "public" / "icons"
 
-    def _load_icon_base64(icon_name):
+    def _load_icon(icon_name):
         icon_path = _icons_path / f'{icon_name}.png'
         try:
             if is_wasm():
-                import pyodide.http
-                resp = pyodide.http.open_url(str(icon_path))
-                icon_bytes = resp.read()
-                if isinstance(icon_bytes, str):
-                    icon_bytes = icon_bytes.encode('latin-1')
-                return f'data:image/png;base64,{base64.b64encode(icon_bytes).decode()}'
+                # In WASM, use the path directly as URL - browser fetches it
+                return str(icon_path)
             else:
+                # Locally, base64 encode for embedded display
                 with open(icon_path, 'rb') as f:
                     return f'data:image/png;base64,{base64.b64encode(f.read()).decode()}'
         except Exception as e:
@@ -386,12 +383,12 @@ def _(is_wasm, mo, penances_df):
             return ''
 
     _class_icons = {
-        'Veteran': _load_icon_base64('veteran'),
-        'Zealot': _load_icon_base64('zealot'),
-        'Psyker': _load_icon_base64('psyker'),
-        'Ogryn': _load_icon_base64('ogryn'),
-        'Arbitrator': _load_icon_base64('arbitrator'),
-        'Hive Scum': _load_icon_base64('hive_scum'),
+        'Veteran': _load_icon('veteran'),
+        'Zealot': _load_icon('zealot'),
+        'Psyker': _load_icon('psyker'),
+        'Ogryn': _load_icon('ogryn'),
+        'Arbitrator': _load_icon('arbitrator'),
+        'Hive Scum': _load_icon('hive_scum'),
     }
 
     _class_stats = []
