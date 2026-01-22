@@ -364,17 +364,58 @@ def _(mo, penances_df):
         mo.stat(label="Weapons", value=f"{weapons_completed}", caption="Completed", bordered=True),
     ]
 
-    # Class penances per class
+    # Class penances per class with icons (base64 encoded for browser compatibility)
+    import base64
+    _icons_path = mo.notebook_location() / "public" / "icons"
+
+    def _load_icon_base64(icon_path):
+        try:
+            with open(icon_path, 'rb') as f:
+                return f'data:image/png;base64,{base64.b64encode(f.read()).decode()}'
+        except:
+            return ''
+
+    _class_icons = {
+        'Veteran': _load_icon_base64(_icons_path / 'veteran.png'),
+        'Zealot': _load_icon_base64(_icons_path / 'zealot.png'),
+        'Psyker': _load_icon_base64(_icons_path / 'psyker.png'),
+        'Ogryn': _load_icon_base64(_icons_path / 'ogryn.png'),
+        'Arbitrator': _load_icon_base64(_icons_path / 'arbitrator.png'),
+        'Hive Scum': _load_icon_base64(_icons_path / 'hive_scum.png'),
+    }
+
     _class_stats = []
     for _cls in ['Arbitrator', 'Hive Scum', 'Ogryn', 'Psyker', 'Veteran', 'Zealot']:
         if _cls in class_summary.index:
             _row = class_summary.loc[_cls]
-            _class_stats.append(mo.stat(
-                label=_cls,
-                value=f"{int(_row['completed'])}/{int(_row['total'])}",
-                caption=f"{int(_row['pct'])}%",
-                bordered=True
-            ))
+            _icon_data = _class_icons.get(_cls, '')
+            _card_html = f'''
+            <div style="
+                position: relative;
+                border: 1px solid var(--border-color, #333);
+                border-radius: 8px;
+                padding: 12px 16px;
+                text-align: center;
+                background: linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(20,20,20,0.9) 100%);
+                overflow: hidden;
+            ">
+                <img src="{_icon_data}" style="
+                    position: absolute;
+                    right: 8px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    width: 48px;
+                    height: 48px;
+                    opacity: 0.3;
+                ">
+                <div style="position: relative; z-index: 1;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted, #888); margin-bottom: 4px;">{_cls}</div>
+                    <div style="font-size: 1.5rem; font-weight: bold;">{int(_row['completed'])}/{int(_row['total'])}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted, #888);">{int(_row['pct'])}%</div>
+                </div>
+            </div>
+            '''
+            _class_stats.append(mo.Html(_card_html))
 
     mo.vstack([
         mo.md("#### ::lucide:trophy:: Categories"),
