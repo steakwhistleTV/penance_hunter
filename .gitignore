@@ -20,3 +20,6 @@ Thumbs.db
 
 # Claude
 CLAUDE.md
+
+# User penance exports (contain UUIDs)
+*-*-*-*-*_*.csv

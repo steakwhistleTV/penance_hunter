@@ -693,11 +693,6 @@ def _(mo, penances_df):
         value="All",
         label="Class"
     )
-
-    mo.vstack([
-        mo.md("#### ::lucide:table:: Penance Data"),
-        mo.hstack([status_filter, category_filter, class_filter], justify="start", gap=1)
-    ])
     return category_filter, class_filter, status_filter, table_df
 
 
@@ -731,7 +726,7 @@ def _(category_filter, class_filter, mo, status_filter, table_df):
         else:
             return {"color": "#ef4444"}
 
-    _display_cols = ["Title", "Description", "Score", "Penance_Class", "Penance_Category", "Status", "Progress", "Goal", "Completion_Time", "PROGRESS", "PROGRESS_BAR"]
+    _display_cols = ["Achievement_ID", "Icon", "Title", "Description", "Score", "Penance_Class", "Penance_Category", "Status", "Progress", "Goal", "Completion_Time", "PROGRESS", "PROGRESS_BAR"]
     _filtered_display = filtered_df[_display_cols].reset_index(drop=True)
 
     penance_table = mo.ui.table(
@@ -745,20 +740,130 @@ def _(category_filter, class_filter, mo, status_filter, table_df):
 
 
 @app.cell
-def _(mo, pd, penance_table):
-    # Selected penances tracker
-    selected = penance_table.value
+def _(mo):
+    # State to persist tracked penances across filter changes
+    get_tracked, set_tracked = mo.state([])
+    return get_tracked, set_tracked
 
-    if selected is not None and isinstance(selected, pd.DataFrame) and len(selected) > 0:
-        _tracked_content = mo.ui.table(selected, page_size=10)
+
+@app.cell
+def _(mo):
+    # run_button returns True when clicked, then auto-resets to False
+    track_btn = mo.ui.run_button(label="::lucide:plus:: Track Selected")
+    clear_btn = mo.ui.run_button(label="::lucide:trash-2:: Clear All", kind="danger")
+    return clear_btn, track_btn
+
+
+@app.cell
+def _(
+    category_filter,
+    class_filter,
+    clear_btn,
+    get_tracked,
+    mo,
+    pd,
+    penance_table,
+    set_tracked,
+    status_filter,
+    track_btn,
+):
+    # Track button clicked - run_button.value is True when clicked
+    if track_btn.value:
+        selected = penance_table.value
+        if selected is not None and isinstance(selected, pd.DataFrame) and len(selected) > 0:
+            current = get_tracked()
+            existing_ids = {p['Achievement_ID'] for p in current}
+            new_penances = selected.to_dict('records')
+            for p in new_penances:
+                if p['Achievement_ID'] not in existing_ids:
+                    current.append(p)
+            set_tracked(current)
+
+    # Clear button clicked
+    if clear_btn.value:
+        set_tracked([])
+
+    # Get current tracked penances
+    tracked_list = get_tracked()
+
+    # Build HTML cards for tracked penances
+    if tracked_list:
+        _cards_html = []
+        for p in tracked_list:
+            icon_path = p.get('Icon', '')
+            # Handle NaN/null values - convert to string and check
+            if pd.isna(icon_path) or not isinstance(icon_path, str):
+                icon_path = ''
+            # Extract filename from path like 'content/ui/textures/icons/achievements/achievement_icon_0124'
+            icon_filename = icon_path.split('/')[-1] if icon_path else ''
+            icon_url = f"public/icons/achievements/{icon_filename}.png" if icon_filename else ''
+            title = p.get('Title', 'Unknown')
+            description = p.get('Description', '')
+            progress = p.get('Progress', 0)
+            goal = p.get('Goal', 1)
+            status = p.get('Status', 'Unknown')
+            pct = min((progress / goal) * 100, 100) if goal > 0 else 0
+
+            # Color based on progress
+            if pct >= 100:
+                bar_color = "#22c55e"  # green
+                status_text = "Completed"
+            elif pct >= 50:
+                bar_color = "#f97316"  # orange
+                status_text = f"{progress}/{goal}"
+            else:
+                bar_color = "#ef4444"  # red
+                status_text = f"{progress}/{goal}"
+
+            card = f'''
+            <div style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px;
+                border: 1px solid var(--border-color, #333);
+                border-radius: 8px;
+                margin-bottom: 8px;
+                background: linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(20,20,20,0.8) 100%);
+            ">
+                <img src="{icon_url}" style="width: 64px; height: 64px; border-radius: 4px;" onerror="this.onerror=null; this.src='public/icons/achievements/achievement_icon_0001.png'">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: bold; margin-bottom: 4px;">{title}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted, #888); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{description}</div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="flex: 1; height: 8px; background: #333; border-radius: 4px; overflow: hidden;">
+                            <div style="width: {pct}%; height: 100%; background: {bar_color}; transition: width 0.3s;"></div>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted, #888); min-width: 60px; text-align: right;">{status_text}</div>
+                    </div>
+                </div>
+            </div>
+            '''
+            _cards_html.append(card)
+
+        _tracked_content = mo.Html(''.join(_cards_html))
     else:
-        _tracked_content = mo.md("_Select penances from the Penance List tab to track them here._").callout(kind="info")
+        _tracked_content = mo.md("_Select penances from the Penance List and click 'Track Selected' to add them here._").callout(kind="info")
+
+    # Status message for tracking
+    _status_msg = mo.md(f"**{len(tracked_list)}** tracked") if tracked_list else mo.md("_Select rows to track_")
+
+    # Filters and buttons in one row
+    _controls = mo.hstack([
+        status_filter, category_filter, class_filter,
+        mo.Html("<div style='width: 1px; height: 24px; background: var(--border-color, #333); margin: 0 8px;'></div>"),
+        track_btn, clear_btn, _status_msg
+    ], justify="start", align="center", gap=1)
 
     # Tabs
-    mo.ui.tabs({
-        "::lucide:list:: Penance List": penance_table,
-        f"::lucide:target:: Tracked ({len(selected) if selected is not None and isinstance(selected, pd.DataFrame) else 0})": _tracked_content,
-    })
+    mo.vstack([
+        mo.md("#### ::lucide:table:: Penance Data"),
+        _controls,
+        mo.ui.tabs({
+            "::lucide:list:: Penance List": penance_table,
+            f"::lucide:target:: Tracked ({len(tracked_list)})": _tracked_content,
+        })
+    ])
     return
 
 
