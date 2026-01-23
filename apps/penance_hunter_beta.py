@@ -734,7 +734,7 @@ def _(category_filter, class_filter, mo, status_filter, table_df):
         else:
             return {"color": "#ef4444"}
 
-    _display_cols = ["Achievement_ID", "Icon", "Title", "Description", "Score", "Penance_Class", "Penance_Category", "Status", "Progress", "Goal", "Completion_Time", "PROGRESS", "PROGRESS_BAR"]
+    _display_cols = ["Title", "Description", "Score", "Penance_Class", "Penance_Category", "Progress", "Goal", "PROGRESS", "PROGRESS_BAR", "Status", "Completion_Time", "Achievement_ID", "Icon"]
     _filtered_display = filtered_df[_display_cols].reset_index(drop=True)
 
     penance_table = mo.ui.table(
