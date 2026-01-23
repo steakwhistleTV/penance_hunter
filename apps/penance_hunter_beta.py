@@ -288,6 +288,7 @@ def _(mo, penances_df):
     # 1. Account Penances
     account_df = penances_df[penances_df['Category'].isin(['loc_achievement_category_account_label'])]
     account_completed = len(account_df[account_df['Status'] == 'Completed'])
+    account_in_progress = len(account_df[account_df['Status'] == 'In Progress'])
     account_total = len(account_df)
 
     # 2. Class Penances
@@ -311,6 +312,7 @@ def _(mo, penances_df):
     # 4. Heretical Penances
     heretical_df = penances_df[penances_df['Category'].isin(['loc_achievement_category_heretics_label'])]
     heretical_completed = len(heretical_df[heretical_df['Status'] == 'Completed'])
+    heretical_in_progress = len(heretical_df[heretical_df['Status'] == 'In Progress'])
 
     # 5. Missions Penances
     missions_df = penances_df[penances_df['Category'].isin([
@@ -331,6 +333,7 @@ def _(mo, penances_df):
         (penances_df['Category'].isin(['loc_achievement_subcategory_twins_mission_label']))
     ]
     exploration_completed = len(exploration_df[exploration_df['Status'] == 'Completed'])
+    exploration_in_progress = len(exploration_df[exploration_df['Status'] == 'In Progress'])
 
     # 7. Endeavours Penances (leftover)
     excluded_categories = [
@@ -346,22 +349,24 @@ def _(mo, penances_df):
     leftover_df = penances_df[~penances_df['Category'].isin(excluded_categories)]
     leftover_df = leftover_df[~leftover_df['Achievement_ID'].str.contains(exploration_regex, case=False, na=False)]
     endeavours_completed = len(leftover_df[leftover_df['Status'] == 'Completed'])
+    endeavours_in_progress = len(leftover_df[leftover_df['Status'] == 'In Progress'])
 
     # 8. Weapons Penances
     weapons_df = penances_df[penances_df['Category'].isin([
         'loc_weapon_progression_mastery', 'loc_achievement_category_weapons_label'
     ])]
     weapons_completed = len(weapons_df[weapons_df['Status'] == 'Completed'])
+    weapons_in_progress = len(weapons_df[weapons_df['Status'] == 'In Progress'])
 
     # All categories in one row
     _cat_stats = [
-        mo.stat(label="Account", value=f"{account_completed}", caption="Completed", bordered=True),
+        mo.stat(label="Account", value=f"{account_completed}", caption=f"{account_in_progress} in progress" if account_in_progress else "Completed", bordered=True),
         mo.stat(label="Tactical", value=f"{tactical_completed}", caption=f"{tactical_in_progress} in progress" if tactical_in_progress else "Completed", bordered=True),
-        mo.stat(label="Heretical", value=f"{heretical_completed}", caption="Completed", bordered=True),
+        mo.stat(label="Heretical", value=f"{heretical_completed}", caption=f"{heretical_in_progress} in progress" if heretical_in_progress else "Completed", bordered=True),
         mo.stat(label="Missions", value=f"{missions_completed}", caption=f"{missions_in_progress} in progress" if missions_in_progress else "Completed", bordered=True),
-        mo.stat(label="Exploration", value=f"{exploration_completed}", caption="Completed", bordered=True),
-        mo.stat(label="Endeavours", value=f"{endeavours_completed}", caption="Completed", bordered=True),
-        mo.stat(label="Weapons", value=f"{weapons_completed}", caption="Completed", bordered=True),
+        mo.stat(label="Exploration", value=f"{exploration_completed}", caption=f"{exploration_in_progress} in progress" if exploration_in_progress else "Completed", bordered=True),
+        mo.stat(label="Endeavours", value=f"{endeavours_completed}", caption=f"{endeavours_in_progress} in progress" if endeavours_in_progress else "Completed", bordered=True),
+        mo.stat(label="Weapons", value=f"{weapons_completed}", caption=f"{weapons_in_progress} in progress" if weapons_in_progress else "Completed", bordered=True),
     ]
 
     # Class penances per class with icons
