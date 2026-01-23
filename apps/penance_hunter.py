@@ -4,7 +4,7 @@
 #     "altair==6.0.0",
 #     "marimo",
 #     "pandas==2.3.3",
-#     "pyfiglet",
+#     "pyfiglet==1.0.4",
 #     "pyarrow",
 # ]
 # [tool.marimo.display]
@@ -229,7 +229,7 @@ def _(account_meta, completed_df, export_timestamp, mo, penances_df):
         }
         _char_stats = []
         for char in all_chars:
-            # Parse: "1. glowm (Zealot) - Level 30 (True: 169, Prestige: 4)" or "2. Zek (Hive Scum) - Level 30"
+            # Parse: "1. gern (Zealot) - Level 30 (True: 169, Prestige: 4)" or "2. Zek (Hive Scum) - Level 30"
             char_match = _re.match(r'\d+\.\s*(.+?)\s*\(([^)]+)\)\s*-\s*Level\s*(\d+)(?:\s*\(True:\s*(\d+),\s*Prestige:\s*(\d+)\))?', char)
             if char_match:
                 name, cls, level, true_level, prestige = char_match.groups()
@@ -288,6 +288,7 @@ def _(mo, penances_df):
     # 1. Account Penances
     account_df = penances_df[penances_df['Category'].isin(['loc_achievement_category_account_label'])]
     account_completed = len(account_df[account_df['Status'] == 'Completed'])
+    account_in_progress = len(account_df[account_df['Status'] == 'In Progress'])
     account_total = len(account_df)
 
     # 2. Class Penances
@@ -311,6 +312,7 @@ def _(mo, penances_df):
     # 4. Heretical Penances
     heretical_df = penances_df[penances_df['Category'].isin(['loc_achievement_category_heretics_label'])]
     heretical_completed = len(heretical_df[heretical_df['Status'] == 'Completed'])
+    heretical_in_progress = len(heretical_df[heretical_df['Status'] == 'In Progress'])
 
     # 5. Missions Penances
     missions_df = penances_df[penances_df['Category'].isin([
@@ -331,6 +333,7 @@ def _(mo, penances_df):
         (penances_df['Category'].isin(['loc_achievement_subcategory_twins_mission_label']))
     ]
     exploration_completed = len(exploration_df[exploration_df['Status'] == 'Completed'])
+    exploration_in_progress = len(exploration_df[exploration_df['Status'] == 'In Progress'])
 
     # 7. Endeavours Penances (leftover)
     excluded_categories = [
@@ -346,49 +349,82 @@ def _(mo, penances_df):
     leftover_df = penances_df[~penances_df['Category'].isin(excluded_categories)]
     leftover_df = leftover_df[~leftover_df['Achievement_ID'].str.contains(exploration_regex, case=False, na=False)]
     endeavours_completed = len(leftover_df[leftover_df['Status'] == 'Completed'])
+    endeavours_in_progress = len(leftover_df[leftover_df['Status'] == 'In Progress'])
 
     # 8. Weapons Penances
     weapons_df = penances_df[penances_df['Category'].isin([
         'loc_weapon_progression_mastery', 'loc_achievement_category_weapons_label'
     ])]
     weapons_completed = len(weapons_df[weapons_df['Status'] == 'Completed'])
+    weapons_in_progress = len(weapons_df[weapons_df['Status'] == 'In Progress'])
 
     # All categories in one row
     _cat_stats = [
-        mo.stat(label="Account", value=f"{account_completed}", caption="Completed", bordered=True),
+        mo.stat(label="Account", value=f"{account_completed}", caption=f"{account_in_progress} in progress" if account_in_progress else "Completed", bordered=True),
         mo.stat(label="Tactical", value=f"{tactical_completed}", caption=f"{tactical_in_progress} in progress" if tactical_in_progress else "Completed", bordered=True),
-        mo.stat(label="Heretical", value=f"{heretical_completed}", caption="Completed", bordered=True),
+        mo.stat(label="Heretical", value=f"{heretical_completed}", caption=f"{heretical_in_progress} in progress" if heretical_in_progress else "Completed", bordered=True),
         mo.stat(label="Missions", value=f"{missions_completed}", caption=f"{missions_in_progress} in progress" if missions_in_progress else "Completed", bordered=True),
-        mo.stat(label="Exploration", value=f"{exploration_completed}", caption="Completed", bordered=True),
-        mo.stat(label="Endeavours", value=f"{endeavours_completed}", caption="Completed", bordered=True),
-        mo.stat(label="Weapons", value=f"{weapons_completed}", caption="Completed", bordered=True),
+        mo.stat(label="Exploration", value=f"{exploration_completed}", caption=f"{exploration_in_progress} in progress" if exploration_in_progress else "Completed", bordered=True),
+        mo.stat(label="Endeavours", value=f"{endeavours_completed}", caption=f"{endeavours_in_progress} in progress" if endeavours_in_progress else "Completed", bordered=True),
+        mo.stat(label="Weapons", value=f"{weapons_completed}", caption=f"{weapons_in_progress} in progress" if weapons_in_progress else "Completed", bordered=True),
     ]
 
-    # Class penances per class
+    # Class penances per class with icons
+    _class_icons = {
+        'Veteran': 'public/icons/veteran.png',
+        'Zealot': 'public/icons/zealot.png',
+        'Psyker': 'public/icons/psyker.png',
+        'Ogryn': 'public/icons/ogryn.png',
+        'Arbitrator': 'public/icons/arbitrator.png',
+        'Hive Scum': 'public/icons/hive_scum.png',
+    }
+
     _class_stats = []
     for _cls in ['Arbitrator', 'Hive Scum', 'Ogryn', 'Psyker', 'Veteran', 'Zealot']:
         if _cls in class_summary.index:
             _row = class_summary.loc[_cls]
-            _class_stats.append(mo.stat(
-                label=_cls,
-                value=f"{int(_row['completed'])}/{int(_row['total'])}",
-                caption=f"{int(_row['pct'])}%",
-                bordered=True
-            ))
+            _icon_data = _class_icons.get(_cls, '')
+            _card_html = f'''
+            <div style="
+                position: relative;
+                border: 1px solid var(--border-color, #333);
+                border-radius: 8px;
+                padding: 12px 16px;
+                text-align: center;
+                background: linear-gradient(135deg, rgba(0,0,0,0.8) 0%, rgba(20,20,20,0.9) 100%);
+                overflow: hidden;
+            ">
+                <img src="{_icon_data}" style="
+                    position: absolute;
+                    right: 8px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    width: 48px;
+                    height: 48px;
+                    opacity: 0.3;
+                ">
+                <div style="position: relative; z-index: 1;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted, #888); margin-bottom: 4px;">{_cls}</div>
+                    <div style="font-size: 1.5rem; font-weight: bold;">{int(_row['completed'])}/{int(_row['total'])}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted, #888);">{int(_row['pct'])}%</div>
+                </div>
+            </div>
+            '''
+            _class_stats.append(mo.Html(_card_html))
 
     mo.vstack([
         mo.md("#### ::lucide:trophy:: Categories"),
         mo.hstack(_cat_stats, widths="equal", align="center"),
-        mo.md("##### Class Penances"),
+        mo.md("##### ::lucide:swords:: Class Penances"),
         mo.hstack(_class_stats, widths="equal", align="center"),
     ])
     return
 
 
 @app.cell(hide_code=True)
-def _(alt, completed_df, mo, pd):
+def _(completed_df, mo, pd):
     # Class mapping for extracting class from Achievement_ID
-    class_mapping = {
+    _class_mapping = {
         'veteran': 'Veteran',
         'zealot': 'Zealot',
         'zelot': 'Zealot',
@@ -398,62 +434,161 @@ def _(alt, completed_df, mo, pd):
         'broker': 'Hive Scum'
     }
 
-    def extract_class(achievement_id):
+    def _extract_class(achievement_id):
         achievement_id_lower = achievement_id.lower()
-        for class_key, class_value in class_mapping.items():
+        for class_key, class_value in _class_mapping.items():
             if class_key in achievement_id_lower:
                 return class_value
         return 'General'
 
-    # Add class to completed penances
-    chart_df = completed_df.copy()
-    chart_df['Penance_Class'] = chart_df['Achievement_ID'].apply(extract_class)
+    # Prepare chart data with class info
+    chart_base_df = completed_df.copy()
+    chart_base_df['Penance_Class'] = chart_base_df['Achievement_ID'].apply(_extract_class)
+
+    # Get date range from data
+    min_date = chart_base_df['Completion_Time'].min()
+    max_date = chart_base_df['Completion_Time'].max()
+
+    # Class filter - multiselect
+    available_classes = ['General', 'Arbitrator', 'Hive Scum', 'Ogryn', 'Psyker', 'Veteran', 'Zealot']
+    chart_class_filter = mo.ui.multiselect(
+        options=available_classes,
+        value=available_classes,
+        label="Classes"
+    )
+
+    # Date range filters
+    chart_start_date = mo.ui.date(
+        value=min_date.date() if pd.notna(min_date) else None,
+        label="Start Date"
+    )
+
+    chart_end_date = mo.ui.date(
+        value=max_date.date() if pd.notna(max_date) else None,
+        label="End Date"
+    )
+
+    chart_use_now = mo.ui.checkbox(label="End at Now", value=False)
+
+    mo.vstack([
+        mo.md("#### ::lucide:chart-line:: Penance Progress Chart"),
+        mo.hstack([
+            chart_class_filter,
+            chart_start_date,
+            chart_end_date,
+            chart_use_now
+        ], justify="start", gap=1)
+    ])
+    return (
+        chart_base_df,
+        chart_class_filter,
+        chart_end_date,
+        chart_start_date,
+        chart_use_now,
+    )
+
+
+@app.cell(hide_code=True)
+def _(
+    alt,
+    chart_base_df,
+    chart_class_filter,
+    chart_end_date,
+    chart_start_date,
+    chart_use_now,
+    mo,
+    pd,
+):
+    # Apply filters
+    filtered_chart_df = chart_base_df.copy()
+
+    # Filter by selected classes
+    if chart_class_filter.value:
+        filtered_chart_df = filtered_chart_df[filtered_chart_df['Penance_Class'].isin(chart_class_filter.value)]
+
+    # Filter by date range
+    if chart_start_date.value:
+        start_dt = pd.Timestamp(chart_start_date.value)
+        filtered_chart_df = filtered_chart_df[filtered_chart_df['Completion_Time'] >= start_dt]
+
+    if chart_use_now.value:
+        end_dt = pd.Timestamp.now()
+    elif chart_end_date.value:
+        end_dt = pd.Timestamp(chart_end_date.value) + pd.Timedelta(days=1)  # Include full end day
+    else:
+        end_dt = None
+
+    if end_dt:
+        filtered_chart_df = filtered_chart_df[filtered_chart_df['Completion_Time'] <= end_dt]
 
     # Sort by completion time and calculate cumulative count per class
-    chart_df = chart_df.sort_values('Completion_Time')
-    chart_df['CCOUNT_PER_CLASS'] = chart_df.groupby('Penance_Class').cumcount() + 1
+    filtered_chart_df = filtered_chart_df.sort_values('Completion_Time')
+    filtered_chart_df['CCOUNT_PER_CLASS'] = filtered_chart_df.groupby('Penance_Class').cumcount() + 1
 
     # Get last point for each class (for endpoint markers)
-    last_points = chart_df.groupby('Penance_Class').last().reset_index()
+    last_points = filtered_chart_df.groupby('Penance_Class').last().reset_index()
 
-    # Extend x-axis slightly past last completion
-    current_date = pd.Timestamp.now() + pd.Timedelta(days=5)
+    # Determine x-axis domain
+    if len(filtered_chart_df) > 0:
+        x_min = filtered_chart_df['Completion_Time'].min()
+        x_max = pd.Timestamp.now() + pd.Timedelta(days=5) if chart_use_now.value else (end_dt + pd.Timedelta(days=5) if end_dt else pd.Timestamp.now() + pd.Timedelta(days=5))
 
-    # Line chart for progression
-    line_chart = alt.Chart(chart_df).mark_line(point=True).encode(
-        x=alt.X('Completion_Time:T', title='Date', scale=alt.Scale(domain=[chart_df['Completion_Time'].min(), current_date])),
-        y=alt.Y('CCOUNT_PER_CLASS:Q', title='Penances Completed'),
-        color=alt.Color('Penance_Class:N', title='Class'),
-        tooltip=[
-            alt.Tooltip('Penance_Class:N', title='Class'),
-            alt.Tooltip('Completion_Time:T', title='Date'),
-            alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for Class'),
-            alt.Tooltip('Title:N', title='Penance')
-        ]
-    )
+        # Line chart for progression
+        line_chart = alt.Chart(filtered_chart_df).mark_line(point=True).encode(
+            x=alt.X('Completion_Time:T', title='Date', scale=alt.Scale(domain=[x_min, x_max])),
+            y=alt.Y('CCOUNT_PER_CLASS:Q', title='Penances Completed'),
+            color=alt.Color('Penance_Class:N', title='Class'),
+            tooltip=[
+                alt.Tooltip('Penance_Class:N', title='Class'),
+                alt.Tooltip('Completion_Time:T', title='Date'),
+                alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for Class'),
+                alt.Tooltip('Title:N', title='Penance')
+            ]
+        )
 
-    # Endpoint markers
-    last_points_chart = alt.Chart(last_points).mark_point(size=200, filled=True).encode(
-        x=alt.X('Completion_Time:T', scale=alt.Scale(domain=[chart_df['Completion_Time'].min(), current_date])),
-        y=alt.Y('CCOUNT_PER_CLASS:Q'),
-        color=alt.Color('Penance_Class:N', title='Class'),
-        tooltip=[
-            alt.Tooltip('Penance_Class:N', title='Class'),
-            alt.Tooltip('Completion_Time:T', title='Date'),
-            alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for Class')
-        ]
-    )
+        # Endpoint markers
+        last_points_chart = alt.Chart(last_points).mark_point(size=200, filled=True).encode(
+            x=alt.X('Completion_Time:T', scale=alt.Scale(domain=[x_min, x_max])),
+            y=alt.Y('CCOUNT_PER_CLASS:Q'),
+            color=alt.Color('Penance_Class:N', title='Class'),
+            tooltip=[
+                alt.Tooltip('Penance_Class:N', title='Class'),
+                alt.Tooltip('Completion_Time:T', title='Date'),
+                alt.Tooltip('CCOUNT_PER_CLASS:Q', title='Total for Class')
+            ]
+        )
 
-    # Layer together
-    class_progression_chart = (
-        line_chart + last_points_chart
-    ).properties(
-        width="container",
-        height=400,
-        title="Operative Penance Progress by Class"
-    ).interactive()
+        # Layer together
+        class_progression_chart = (
+            line_chart + last_points_chart
+        ).properties(
+            width="container",
+            height=400,
+            title="Operative Penance Progress by Class"
+        ).interactive()
 
-    mo.ui.altair_chart(class_progression_chart, chart_selection=False)
+        _chart_output = mo.ui.altair_chart(class_progression_chart, chart_selection=False)
+
+        # Stats for filtered data
+        first_penance_time = filtered_chart_df['Completion_Time'].min()
+        last_penance_time = filtered_chart_df['Completion_Time'].max()
+        total_completed_in_range = len(filtered_chart_df)
+        total_score_in_range = filtered_chart_df['Score'].sum() if 'Score' in filtered_chart_df.columns else 0
+
+        first_str = first_penance_time.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(first_penance_time) else "N/A"
+        last_str = last_penance_time.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(last_penance_time) else "N/A"
+
+        _chart_stats = mo.hstack([
+            mo.stat(label="First in Range", value=first_str, bordered=True),
+            mo.stat(label="Last in Range", value=last_str, bordered=True),
+            mo.stat(label="Completed in Range", value=str(total_completed_in_range), bordered=True),
+            mo.stat(label="Total Score", value=str(total_score_in_range), bordered=True),
+        ], widths="equal", align="center")
+    else:
+        _chart_output = mo.md("_No data matches the selected filters._").callout(kind="warn")
+        _chart_stats = None
+
+    mo.vstack([_chart_output, _chart_stats] if _chart_stats else [_chart_output])
     return
 
 
@@ -558,8 +693,6 @@ def _(mo, penances_df):
         value="All",
         label="Class"
     )
-
-    mo.hstack([status_filter, category_filter, class_filter], justify="start", gap=1)
     return category_filter, class_filter, status_filter, table_df
 
 
@@ -593,7 +726,7 @@ def _(category_filter, class_filter, mo, status_filter, table_df):
         else:
             return {"color": "#ef4444"}
 
-    _display_cols = ["Title", "Description", "Score", "Penance_Class", "Penance_Category", "Status", "Progress", "Goal", "PROGRESS", "PROGRESS_BAR"]
+    _display_cols = ["Achievement_ID", "Icon", "Title", "Description", "Score", "Penance_Class", "Penance_Category", "Status", "Progress", "Goal", "Completion_Time", "PROGRESS", "PROGRESS_BAR"]
     _filtered_display = filtered_df[_display_cols].reset_index(drop=True)
 
     penance_table = mo.ui.table(
@@ -607,20 +740,130 @@ def _(category_filter, class_filter, mo, status_filter, table_df):
 
 
 @app.cell
-def _(mo, pd, penance_table):
-    # Selected penances tracker
-    selected = penance_table.value
+def _(mo):
+    # State to persist tracked penances across filter changes
+    get_tracked, set_tracked = mo.state([])
+    return get_tracked, set_tracked
 
-    if selected is not None and isinstance(selected, pd.DataFrame) and len(selected) > 0:
-        _tracked_content = mo.ui.table(selected, page_size=10)
+
+@app.cell
+def _(mo):
+    # run_button returns True when clicked, then auto-resets to False
+    track_btn = mo.ui.run_button(label="::lucide:plus:: Track Selected")
+    clear_btn = mo.ui.run_button(label="::lucide:trash-2:: Clear All", kind="danger")
+    return clear_btn, track_btn
+
+
+@app.cell
+def _(
+    category_filter,
+    class_filter,
+    clear_btn,
+    get_tracked,
+    mo,
+    pd,
+    penance_table,
+    set_tracked,
+    status_filter,
+    track_btn,
+):
+    # Track button clicked - run_button.value is True when clicked
+    if track_btn.value:
+        selected = penance_table.value
+        if selected is not None and isinstance(selected, pd.DataFrame) and len(selected) > 0:
+            current = get_tracked()
+            existing_ids = {p['Achievement_ID'] for p in current}
+            new_penances = selected.to_dict('records')
+            for p in new_penances:
+                if p['Achievement_ID'] not in existing_ids:
+                    current.append(p)
+            set_tracked(current)
+
+    # Clear button clicked
+    if clear_btn.value:
+        set_tracked([])
+
+    # Get current tracked penances
+    tracked_list = get_tracked()
+
+    # Build HTML cards for tracked penances
+    if tracked_list:
+        _cards_html = []
+        for p in tracked_list:
+            icon_path = p.get('Icon', '')
+            # Handle NaN/null values - convert to string and check
+            if pd.isna(icon_path) or not isinstance(icon_path, str):
+                icon_path = ''
+            # Extract filename from path like 'content/ui/textures/icons/achievements/achievement_icon_0124'
+            icon_filename = icon_path.split('/')[-1] if icon_path else ''
+            icon_url = f"public/icons/achievements/{icon_filename}.png" if icon_filename else ''
+            title = p.get('Title', 'Unknown')
+            description = p.get('Description', '')
+            progress = p.get('Progress', 0)
+            goal = p.get('Goal', 1)
+            status = p.get('Status', 'Unknown')
+            pct = min((progress / goal) * 100, 100) if goal > 0 else 0
+
+            # Color based on progress
+            if pct >= 100:
+                bar_color = "#22c55e"  # green
+                status_text = "Completed"
+            elif pct >= 50:
+                bar_color = "#f97316"  # orange
+                status_text = f"{progress}/{goal}"
+            else:
+                bar_color = "#ef4444"  # red
+                status_text = f"{progress}/{goal}"
+
+            card = f'''
+            <div style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px;
+                border: 1px solid var(--border-color, #333);
+                border-radius: 8px;
+                margin-bottom: 8px;
+                background: linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(20,20,20,0.8) 100%);
+            ">
+                <img src="{icon_url}" style="width: 64px; height: 64px; border-radius: 4px;" onerror="this.onerror=null; this.src='public/icons/achievements/achievement_icon_0001.png'">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: bold; margin-bottom: 4px;">{title}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted, #888); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{description}</div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="flex: 1; height: 8px; background: #333; border-radius: 4px; overflow: hidden;">
+                            <div style="width: {pct}%; height: 100%; background: {bar_color}; transition: width 0.3s;"></div>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted, #888); min-width: 60px; text-align: right;">{status_text}</div>
+                    </div>
+                </div>
+            </div>
+            '''
+            _cards_html.append(card)
+
+        _tracked_content = mo.Html(''.join(_cards_html))
     else:
-        _tracked_content = mo.md("_Select penances from the Penance List tab to track them here._").callout(kind="info")
+        _tracked_content = mo.md("_Select penances from the Penance List and click 'Track Selected' to add them here._").callout(kind="info")
+
+    # Status message for tracking
+    _status_msg = mo.md(f"**{len(tracked_list)}** tracked") if tracked_list else mo.md("_Select rows to track_")
+
+    # Filters and buttons in one row
+    _controls = mo.hstack([
+        status_filter, category_filter, class_filter,
+        mo.Html("<div style='width: 1px; height: 24px; background: var(--border-color, #333); margin: 0 8px;'></div>"),
+        track_btn, clear_btn, _status_msg
+    ], justify="start", align="center", gap=1)
 
     # Tabs
-    mo.ui.tabs({
-        "::lucide:list:: Penance List": penance_table,
-        f"::lucide:target:: Tracked ({len(selected) if selected is not None and isinstance(selected, pd.DataFrame) else 0})": _tracked_content,
-    })
+    mo.vstack([
+        mo.md("#### ::lucide:table:: Penance Data"),
+        _controls,
+        mo.ui.tabs({
+            "::lucide:list:: Penance List": penance_table,
+            f"::lucide:target:: Tracked ({len(tracked_list)})": _tracked_content,
+        })
+    ])
     return
 
 
