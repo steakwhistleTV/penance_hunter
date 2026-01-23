@@ -434,8 +434,12 @@ def _(completed_df, mo, pd):
         'broker': 'Hive Scum'
     }
 
-    def _extract_class(achievement_id):
-        achievement_id_lower = achievement_id.lower()
+    def _extract_class(row):
+        # Only extract class for actual class penances, not enemy kills or weapons
+        category = row.get('Category', '')
+        if category not in ['loc_class_abilities_title', 'loc_class_progression_title']:
+            return 'General'
+        achievement_id_lower = row['Achievement_ID'].lower()
         for class_key, class_value in _class_mapping.items():
             if class_key in achievement_id_lower:
                 return class_value
@@ -443,7 +447,7 @@ def _(completed_df, mo, pd):
 
     # Prepare chart data with class info
     chart_base_df = completed_df.copy()
-    chart_base_df['Penance_Class'] = chart_base_df['Achievement_ID'].apply(_extract_class)
+    chart_base_df['Penance_Class'] = chart_base_df.apply(_extract_class, axis=1)
 
     # Get date range from data
     min_date = chart_base_df['Completion_Time'].min()
@@ -605,8 +609,12 @@ def _(mo, penances_df):
         'broker': 'Hive Scum'
     }
 
-    def _extract_class(achievement_id):
-        achievement_id_lower = achievement_id.lower()
+    def _extract_class(row):
+        # Only extract class for actual class penances, not enemy kills or weapons
+        category = row.get('Category', '')
+        if category not in ['loc_class_abilities_title', 'loc_class_progression_title']:
+            return 'General'
+        achievement_id_lower = row['Achievement_ID'].lower()
         for class_key, class_value in _class_mapping.items():
             if class_key in achievement_id_lower:
                 return class_value
@@ -614,7 +622,7 @@ def _(mo, penances_df):
 
     # Add class column and Penance_Category to dataframe
     table_df = penances_df.copy()
-    table_df['Penance_Class'] = table_df['Achievement_ID'].apply(_extract_class)
+    table_df['Penance_Class'] = table_df.apply(_extract_class, axis=1)
 
     # Map raw Category to friendly category names
     _category_map = {
