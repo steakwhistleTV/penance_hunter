@@ -65,140 +65,183 @@ def main():
   <title>Penance Hunter</title>
   <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
       font-family: Arial, sans-serif;
       line-height: 1.6;
       color: #e0e0e0;
-      background-color: #1a1a1a;
-      padding: 20px;
       margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: url('apps/public/penances_background.png') center center / cover no-repeat fixed;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      z-index: 0;
+    }
+    .page-wrapper {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
     .container {
       max-width: 800px;
       margin: 0 auto;
+      padding: 0 20px;
     }
     header {
-      background-color: #2a2a2a;
-      padding: 30px 20px;
+      padding: 60px 20px 40px;
       text-align: center;
-      margin-bottom: 30px;
-      border-bottom: 2px solid #8b0000;
     }
     h1 {
       font-family: 'UnifrakturCook', serif;
-      font-size: 42px;
+      font-size: 56px;
       margin-bottom: 10px;
       color: #c9a227;
+      text-shadow: 0 0 20px rgba(139, 0, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.8);
     }
     .subtitle {
-      font-size: 16px;
-      color: #888;
+      font-size: 18px;
+      color: #ccc;
       margin: 0 auto;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    }
+    main {
+      flex: 1;
+      padding: 20px;
     }
     .section-title {
-      font-size: 20px;
-      margin: 20px 0 10px;
+      font-size: 22px;
+      margin: 20px 0 20px;
       text-align: center;
       color: #c9a227;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
     }
     .cards {
       display: flex;
       flex-wrap: wrap;
-      gap: 20px;
+      gap: 24px;
       margin: 20px 0;
       justify-content: center;
     }
     .card {
-      background-color: #2a2a2a;
-      border: 1px solid #444;
+      background: rgba(20, 20, 20, 0.85);
+      border: 1px solid rgba(139, 0, 0, 0.5);
+      border-radius: 8px;
       flex: 1 0 300px;
       max-width: 350px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
     }
     .card-header {
-      background-color: #3a3a3a;
-      padding: 15px;
+      background: rgba(139, 0, 0, 0.3);
+      padding: 16px 20px;
       font-weight: bold;
-      font-size: 18px;
+      font-size: 20px;
       color: #e0e0e0;
-      border-bottom: 1px solid #444;
+      border-bottom: 1px solid rgba(139, 0, 0, 0.5);
+      border-radius: 8px 8px 0 0;
     }
     .card-body {
       padding: 20px;
     }
     .card-description {
-      color: #888;
-      margin-bottom: 15px;
+      color: #aaa;
+      margin-bottom: 20px;
       font-size: 14px;
+      line-height: 1.5;
     }
     .card-link {
       display: inline-block;
-      background-color: #8b0000;
+      background: linear-gradient(135deg, #8b0000 0%, #5c0000 100%);
       color: white;
-      padding: 10px 20px;
+      padding: 12px 24px;
       text-decoration: none;
       font-weight: bold;
-      transition: background-color 0.2s;
+      border-radius: 4px;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(139, 0, 0, 0.4);
     }
     .card-link:hover {
-      background-color: #a50000;
+      background: linear-gradient(135deg, #a50000 0%, #6c0000 100%);
+      box-shadow: 0 4px 12px rgba(139, 0, 0, 0.6);
     }
     .card-link.beta {
-      background-color: #c9a227;
+      background: linear-gradient(135deg, #c9a227 0%, #8b6914 100%);
       color: #1a1a1a;
+      box-shadow: 0 2px 8px rgba(201, 162, 39, 0.4);
     }
     .card-link.beta:hover {
-      background-color: #ddb52f;
+      background: linear-gradient(135deg, #ddb52f 0%, #a57a18 100%);
+      box-shadow: 0 4px 12px rgba(201, 162, 39, 0.6);
     }
     footer {
-      background-color: #2a2a2a;
       text-align: center;
-      padding: 20px 0;
-      margin-top: 40px;
-      border-top: 1px solid #444;
+      padding: 30px 20px;
+      border-top: 1px solid rgba(139, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.3);
     }
     footer p {
-      color: #666;
+      color: #888;
       font-size: 14px;
+      margin: 0;
     }
     footer a {
       color: #c9a227;
       text-decoration: none;
     }
+    footer a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
-  <header>
-    <div class="container">
-      <h1>Penance Hunter</h1>
-      <p class="subtitle">Track your Darktide penance progress</p>
-    </div>
-  </header>
+  <div class="page-wrapper">
+    <header>
+      <div class="container">
+        <h1>Penance Hunter</h1>
+        <p class="subtitle">Track your Darktide penance progress</p>
+      </div>
+    </header>
 
-  <main class="container">
-    <h2 class="section-title">Apps</h2>
-    <div class="cards">
-      <div class="card">
-        <div class="card-header">Penance Hunter</div>
-        <div class="card-body">
-          <p class="card-description">Stable release - view and track your penance completion progress.</p>
-          <a href="apps/penance_hunter.html" class="card-link">Open App</a>
+    <main class="container">
+      <h2 class="section-title">Choose Version</h2>
+      <div class="cards">
+        <div class="card">
+          <div class="card-header">Stable</div>
+          <div class="card-body">
+            <p class="card-description">Production release with tested features. View and track your penance completion progress.</p>
+            <a href="apps/penance_hunter.html" class="card-link">Open Stable</a>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">Beta</div>
+          <div class="card-body">
+            <p class="card-description">Latest features in testing. May contain bugs but includes newest improvements.</p>
+            <a href="beta/penance_hunter.html" class="card-link beta">Open Beta</a>
+          </div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-header">Penance Hunter (Beta)</div>
-        <div class="card-body">
-          <p class="card-description">Beta version with new features - sidebar, operatives stats, and class charts.</p>
-          <a href="beta/penance_hunter.html" class="card-link beta">Open Beta</a>
-        </div>
-      </div>
-    </div>
-  </main>
+    </main>
 
-  <footer>
-    <div class="container">
-      <p>Built with <a href="https://marimo.io" target="_blank">marimo</a></p>
-    </div>
-  </footer>
+    <footer>
+      <div class="container">
+        <p>Built with <a href="https://marimo.io" target="_blank">marimo</a> | <a href="https://github.com/steakwhistleTV/penance_hunter" target="_blank">GitHub</a></p>
+      </div>
+    </footer>
+  </div>
 </body>
 </html>
 ''')
