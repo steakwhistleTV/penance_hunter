@@ -159,9 +159,27 @@ def main():
     }
     .card-description {
       color: #aaa;
-      margin-bottom: 20px;
+      margin-bottom: 12px;
       font-size: 14px;
       line-height: 1.5;
+    }
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 20px 0;
+      font-size: 13px;
+    }
+    .feature-list li {
+      color: #999;
+      padding: 4px 0;
+      padding-left: 18px;
+      position: relative;
+    }
+    .feature-list li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #c9a227;
     }
     .card-link {
       display: inline-block;
@@ -222,14 +240,26 @@ def main():
         <div class="card">
           <div class="card-header">Stable</div>
           <div class="card-body">
-            <p class="card-description">Production release with tested features. View and track your penance completion progress.</p>
+            <p class="card-description">Production release with tested features.</p>
+            <ul class="feature-list">
+              <li>Penance tracking with icons</li>
+              <li>Progress charts by class</li>
+              <li>Category & class breakdown</li>
+              <li>Operative stats display</li>
+            </ul>
             <a href="apps/penance_hunter.html" class="card-link">Open Stable</a>
           </div>
         </div>
         <div class="card">
           <div class="card-header">Beta</div>
           <div class="card-body">
-            <p class="card-description">Latest features in testing. May contain bugs but includes newest improvements.</p>
+            <p class="card-description">Latest improvements in testing.</p>
+            <ul class="feature-list">
+              <li>All stable features</li>
+              <li>Improved class filtering</li>
+              <li>Cleaner table columns</li>
+              <li>Bug fixes in testing</li>
+            </ul>
             <a href="beta/penance_hunter.html" class="card-link beta">Open Beta</a>
           </div>
         </div>
