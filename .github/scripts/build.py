@@ -92,7 +92,7 @@ def main():
       flex-direction: column;
     }
     .container {
-      max-width: 800px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 0 20px;
     }
@@ -102,56 +102,62 @@ def main():
     }
     h1 {
       font-family: 'UnifrakturCook', serif;
-      font-size: 56px;
+      font-size: 48px;
       margin-bottom: 10px;
       color: #c9a227;
-      text-shadow: 0 0 20px rgba(139, 0, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.8);
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
     }
     .subtitle {
-      font-size: 18px;
-      color: #ccc;
+      font-size: 16px;
+      color: #999;
       margin: 0 auto;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
     }
     main {
       flex: 1;
       padding: 20px;
     }
     .section-title {
-      font-size: 22px;
+      font-size: 18px;
       margin: 20px 0 20px;
       text-align: center;
-      color: #c9a227;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+      color: #888;
+      font-weight: normal;
+      text-transform: uppercase;
+      letter-spacing: 2px;
     }
     .cards {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 24px;
       margin: 20px 0;
       justify-content: center;
     }
+    @media (max-width: 700px) {
+      .cards {
+        flex-wrap: wrap;
+      }
+    }
     .card {
-      background: rgba(20, 20, 20, 0.85);
-      border: 1px solid rgba(139, 0, 0, 0.5);
+      background: rgba(15, 15, 18, 0.95);
+      border: 1px solid rgba(60, 60, 70, 0.6);
       border-radius: 8px;
-      flex: 1 0 300px;
-      max-width: 350px;
+      flex: 0 1 380px;
       backdrop-filter: blur(10px);
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
     }
     .card:hover {
       transform: translateY(-4px);
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+      border-color: rgba(201, 162, 39, 0.5);
     }
     .card-header {
-      background: rgba(139, 0, 0, 0.3);
+      background: rgba(30, 30, 35, 0.9);
       padding: 16px 20px;
       font-weight: bold;
-      font-size: 20px;
+      font-size: 18px;
       color: #e0e0e0;
-      border-bottom: 1px solid rgba(139, 0, 0, 0.5);
+      border-bottom: 1px solid rgba(60, 60, 70, 0.6);
       border-radius: 8px 8px 0 0;
     }
     .card-body {
@@ -176,52 +182,65 @@ def main():
       position: relative;
     }
     .feature-list li::before {
-      content: '✓';
+      content: '•';
       position: absolute;
       left: 0;
+      color: #666;
+    }
+    .feature-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
       color: #c9a227;
+      margin: 12px 0 6px 0;
+      font-weight: 600;
+    }
+    .feature-list.compact {
+      margin-bottom: 8px;
     }
     .card-link {
       display: inline-block;
-      background: linear-gradient(135deg, #8b0000 0%, #5c0000 100%);
-      color: white;
-      padding: 12px 24px;
+      background: linear-gradient(135deg, #4a4a55 0%, #35353d 100%);
+      color: #e0e0e0;
+      padding: 10px 20px;
       text-decoration: none;
-      font-weight: bold;
+      font-weight: 600;
+      font-size: 14px;
       border-radius: 4px;
       transition: all 0.2s;
-      box-shadow: 0 2px 8px rgba(139, 0, 0, 0.4);
+      border: 1px solid rgba(80, 80, 90, 0.5);
     }
     .card-link:hover {
-      background: linear-gradient(135deg, #a50000 0%, #6c0000 100%);
-      box-shadow: 0 4px 12px rgba(139, 0, 0, 0.6);
+      background: linear-gradient(135deg, #5a5a65 0%, #45454d 100%);
+      border-color: rgba(201, 162, 39, 0.5);
+      color: #fff;
     }
     .card-link.beta {
-      background: linear-gradient(135deg, #c9a227 0%, #8b6914 100%);
+      background: linear-gradient(135deg, #c9a227 0%, #a08520 100%);
       color: #1a1a1a;
-      box-shadow: 0 2px 8px rgba(201, 162, 39, 0.4);
+      border: 1px solid rgba(201, 162, 39, 0.6);
     }
     .card-link.beta:hover {
-      background: linear-gradient(135deg, #ddb52f 0%, #a57a18 100%);
-      box-shadow: 0 4px 12px rgba(201, 162, 39, 0.6);
+      background: linear-gradient(135deg, #d9b237 0%, #b09530 100%);
+      border-color: rgba(221, 182, 59, 0.8);
     }
     footer {
       text-align: center;
       padding: 30px 20px;
-      border-top: 1px solid rgba(139, 0, 0, 0.3);
-      background: rgba(0, 0, 0, 0.3);
+      border-top: 1px solid rgba(60, 60, 70, 0.4);
+      background: rgba(10, 10, 12, 0.5);
     }
     footer p {
-      color: #888;
-      font-size: 14px;
+      color: #666;
+      font-size: 13px;
       margin: 0;
     }
     footer a {
-      color: #c9a227;
+      color: #888;
       text-decoration: none;
     }
     footer a:hover {
-      text-decoration: underline;
+      color: #c9a227;
     }
   </style>
 </head>
@@ -242,9 +261,9 @@ def main():
           <div class="card-body">
             <p class="card-description">Production release with tested features.</p>
             <ul class="feature-list">
-              <li>Penance tracking with icons</li>
+              <li>Track penances with icons</li>
               <li>Progress charts by class</li>
-              <li>Category & class breakdown</li>
+              <li>Category &amp; class breakdown</li>
               <li>Operative stats display</li>
             </ul>
             <a href="apps/penance_hunter.html" class="card-link">Open Stable</a>
@@ -253,9 +272,9 @@ def main():
         <div class="card">
           <div class="card-header">Beta</div>
           <div class="card-body">
-            <p class="card-description">Latest improvements in testing.</p>
-            <ul class="feature-list">
-              <li>All stable features</li>
+            <p class="card-description">All stable features plus new improvements.</p>
+            <p class="feature-label">Beta Features</p>
+            <ul class="feature-list compact">
               <li>Save &amp; load tracking profiles</li>
               <li>Improved class filtering</li>
               <li>Cleaner table columns</li>
