@@ -2,193 +2,104 @@
 
 Track and visualize your Warhammer 40,000: Darktide penance progress.
 
-This project has two components that work together:
-
-1. **Penance Exporter** - Darktide mod that exports your penance data to CSV
-2. **Penance Hunter** - [marimo](https://marimo.io) notebook that visualizes your exported data
+**[Launch Web App](https://steakwhistletv.github.io/penance_hunter/)** | **[Beta Version](https://steakwhistletv.github.io/penance_hunter/beta/penance_hunter.html)**
 
 ## Quick Start
 
-### Step 1: Export Your Penances (In-Game)
+### 1. Export Your Penances (In-Game)
 
-1. Install the Penance Exporter mod (see [Installing the Mod](#installing-the-mod) below)
-2. Launch Darktide and open the **Penances menu** (required for export to work)
-3. Press the export keybind (default: **F9**) or type `/export_penances` in chat
-4. Your CSV file is saved to `%APPDATA%/Fatshark/Darktide/penance_exporter/`
+1. Install the mod (requires [Darktide Mod Framework](https://www.nexusmods.com/warhammer40kdarktide/mods/8))
+2. Copy `penance_exporter/` to `%APPDATA%/Fatshark/Darktide/mods/`
+3. Add `penance_exporter` to `mod_load_order.txt`
+4. In-game: Open Penances menu, press **F9** (or `/export_penances`)
+5. CSV saved to `%APPDATA%/Fatshark/Darktide/penance_exporter/`
 
-### Step 2: View Your Data
+### 2. View Your Data
 
-**Option A: Use the GitHub hosted notebook (no installation required)**
+**Web (recommended):** Go to [steakwhistletv.github.io/penance_hunter](https://steakwhistletv.github.io/penance_hunter/), drop your CSV. All processing is local.
 
-1. Go to [steakwhistletv.github.io/penance_hunter](https://steakwhistletv.github.io/penance_hunter/)
-2. Drop your exported CSV file into the upload area
-3. Explore your penance progress
-4. All data processing is done locally, no exported data is sent to any external server
+**Local:** `uvx marimo run apps/penance_hunter.py`
 
-**Option B: Run locally with uv & marimo**
+## Features
 
-```bash
-# Run the notebook (dependencies are installed automatically via inline script metadata)
-uvx marimo run apps/penance_hunter.py
-```
+- Account overview with completion %, levels, prestige
+- All operatives with individual stats
+- Category & class breakdown charts
+- Progress timeline with date filtering
+- Filterable penance list
+- Track specific penances
+- **Beta:** Save/load tracking profiles
 
----
+## CSV Format
 
-## Installing the Mod
+The mod exports CSV with comment header containing account metadata, followed by penance data.
 
-The Penance Exporter mod requires the [Darktide Mod Framework (DMF)](https://www.nexusmods.com/warhammer40kdarktide/mods/8).
-
-If you're new to Darktide modding, follow the [Darktide Mod Framework installation guide](https://dmf-docs.darkti.de/#/installing-mods) first.
-
-### Installing Penance Exporter
-
-1. Download or copy the `penance_exporter` folder from this repository
-2. Place it in your Darktide mods folder:
-   ```
-   %APPDATA%/Fatshark/Darktide/mods/penance_exporter/
-   ```
-3. Add the mod to your `mod_load_order.txt`:
-   ```
-   penance_exporter
-   ```
-4. Launch Darktide - you should see "Penance Exporter loaded" in chat
-
-### Mod Usage
-
-- **Keybind**: Press **F9** while in the Penances menu to export (configurable in mod settings)
-- **Chat command**: Type `/export_penances` while in the Penances menu
-- **Output location**: `%APPDATA%/Fatshark/Darktide/penance_exporter/`
-
-The exported CSV filename includes your account ID and timestamp, e.g.:
-```
-12345678-1234-1234-1234-123456789abc_20260118_103938.csv
-```
-
----
-
-## Penance Hunter Web App
-
-The web app provides:
-
-- **Account overview** - Total completion, account level, true level, account prestige, export timestamp with timezone
-- **Operatives display** - All your characters with their levels and individual prestige
-- **Category breakdown** - Progress across Account, Class, Tactical, Heretical, Missions, Exploration, Endeavours, and Weapons penances
-- **Class penances** - Per-class completion stats (Veteran, Zealot, Psyker, Ogryn, Arbitrator, Hive Scum)
-- **Progress chart** - Visualize your penance completion over time by class with:
-  - Class filter (multiselect to show/hide specific classes)
-  - Date range filter (start/end dates with "End at Now" option)
-  - Stats cards showing first/last completion in range, count, and total score
-- **Filterable penance list** - Filter by status, category, and class
-- **Tracking** - Select penances to track in a separate tab
-
-### Versions
-
-- **Stable**: [steakwhistletv.github.io/penance_hunter/apps/penance_hunter.html](https://steakwhistletv.github.io/penance_hunter/apps/penance_hunter.html)
-- **Beta**: [steakwhistletv.github.io/penance_hunter/beta/penance_hunter.html](https://steakwhistletv.github.io/penance_hunter/beta/penance_hunter.html) - Experimental and new feature testing, could have bugs
-
----
-
-## CSV Export Format
-
-The exported CSV includes metadata in comments at the top (account info, character list, export stats) followed by penance data.
-
-### Header Metadata (Comments)
-
-The CSV header contains account-level metadata as comments:
+<details>
+<summary>Header fields (comments)</summary>
 
 | Field | Description |
 |-------|-------------|
-| Mod Version | Version of penance_exporter that created the file |
-| Account | Account display name |
-| Account ID | Unique account identifier |
-| Account Level | Sum of all character base levels |
-| Account True Level | Sum of all character true levels (includes prestige) |
-| Account Prestige | Sum of all character prestiges |
-| All Characters | List of all characters with name, class, level, true level, and prestige |
-| Export Character | Name of the character used to export |
-| Export Timezone | Local timezone offset (e.g., `-0500`) |
+| Mod Version | Version of penance_exporter |
+| Account | Display name |
+| Account Level | Sum of character base levels |
+| Account True Level | Sum including prestige |
+| Account Prestige | Sum of all prestiges |
+| All Characters | List with name, class, level, true level, prestige |
+| Export Timezone | Local timezone offset |
 
-### CSV Export Fields
+</details>
 
-#### **Export metadata** (generated by the mod):
-
-| Field | Description |
-|-------|-------------|
-| Export_Account | Account name of the exporter |
-| Export_Platform | Platform (Steam, Xbox, etc.) |
-| Export_Character | Character name of the current selected operative |
-| Export_Archetype | Character class of the current selected operative |
-| Export_Mod_Date | Export timestamp |
-
-#### **Penance data** (from Darktide's achievement API):
+<details>
+<summary>Penance data fields</summary>
 
 | Field | Description |
 |-------|-------------|
-| Achievement_ID | Unique penance identifier |
-| Category | Penance category localization key |
-| Icon | Icon asset path |
-| Title | Penance display name (localized) |
-| Description | Penance requirements text (localized) |
-| Status | Completion status (Completed, In Progress) |
-| Progress | Current progress value |
-| Goal | Target value to complete |
-| Progress_Percentage | Calculated: `(Progress / Goal) * 100` |
-| Completion_Time | Timestamp when completed (if applicable) |
-| Score | Points awarded for completion |
-| Stats_Detail | Per-stat breakdown from stat definitions |
+| Achievement_ID | Unique identifier |
+| Category | Category localization key |
+| Title | Display name |
+| Description | Requirements text |
+| Status | Completed / In Progress |
+| Progress / Goal | Current and target values |
+| Completion_Time | When completed |
+| Score | Points awarded |
 
-### How the Mod Parses Penance Data
+</details>
 
-The mod hooks into Darktide's `PenanceOverviewView` (the in-game penance menu) to access achievement data. When you trigger an export:
+<details>
+<summary>How the mod works</summary>
 
-1. **Achievement list**: Retrieved from `view._achievements_by_category`, which contains all achievement IDs grouped by category
-2. **Achievement definitions**: For each ID, the mod calls `AchievementUIHelper.achievement_definition_by_id()` and `Managers.achievements:achievement_definition()` to get the penance metadata
-3. **Completion status**: `Managers.achievements:achievement_completed(player, achievement_id)` returns whether completed and the completion timestamp
-4. **Progress tracking**: `AchievementTypes[definition.type].get_progress()` returns current progress and goal values for achievements with progress tracking
-5. **Stat details**: For achievements with stat requirements, reads individual stat values via `Managers.stats.read_user_stat()`
+The mod hooks into `PenanceOverviewView` to access achievement data:
 
-The mod requires the penance menu to be open because that's when Darktide loads achievement data into memory.
+1. Retrieves achievement list from `view._achievements_by_category`
+2. Gets definitions via `AchievementUIHelper.achievement_definition_by_id()`
+3. Checks completion with `Managers.achievements:achievement_completed()`
+4. Reads progress from `AchievementTypes[definition.type].get_progress()`
 
-### References
+Requires penance menu to be open (that's when Darktide loads the data).
 
-- [Aussiemon/Darktide-Source-Code](https://github.com/Aussiemon/Darktide-Source-Code) - Community-maintained repository of extracted Darktide Lua scripts. The achievement system code is in:
-  - `scripts/managers/achievements/` - Achievement manager and types
-  - `scripts/managers/achievements/utility/achievement_ui_helper.lua` - UI helper functions
-  - `scripts/settings/achievements/` - Achievement categories and definitions
-- [Darktide Mod Framework (DMF)](https://dmf-docs.darkti.de/) - Documentation for the mod framework used by penance_exporter
-
----
+</details>
 
 ## Development
 
-### Running Locally
-
 ```bash
-# Clone the repository
 git clone https://github.com/steakwhistleTV/penance_hunter.git
 cd penance_hunter
-
-# Run in edit mode (dependencies installed automatically via inline script metadata)
-uvx marimo edit apps/penance_hunter.py
-
-# Or run in app mode
-uvx marimo run apps/penance_hunter.py
+uvx marimo edit apps/penance_hunter_beta.py  # Edit beta
+uvx marimo run apps/penance_hunter.py        # Run stable
 ```
 
-### Project Structure
+```
+apps/
+  penance_hunter.py        # Stable
+  penance_hunter_beta.py   # Beta
+  public/                  # Sample data
+penance_exporter/
+  scripts/mods/penance_exporter/
+    penance_exporter.lua   # Main mod
+```
 
-```
-penance_hunter/
-├── apps/
-│   ├── penance_hunter.py       # Stable marimo notebook
-│   ├── penance_hunter_beta.py  # Beta version with new features
-│   └── public/                 # Sample data for demos
-├── penance_exporter/           # Darktide mod
-│   ├── penance_exporter.mod
-│   └── scripts/mods/penance_exporter/
-│       ├── penance_exporter.lua
-│       ├── penance_exporter_data.lua
-│       └── penance_exporter_localization.lua
-└── .github/
-    └── scripts/build.py        # GitHub Pages build script
-```
+## References
+
+- [Darktide Mod Framework](https://dmf-docs.darkti.de/)
+- [Darktide Source Code](https://github.com/Aussiemon/Darktide-Source-Code) - Achievement system in `scripts/managers/achievements/`
+- [marimo](https://marimo.io)
