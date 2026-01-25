@@ -256,9 +256,9 @@ def main():
             <p class="card-description">Latest improvements in testing.</p>
             <ul class="feature-list">
               <li>All stable features</li>
+              <li>Save &amp; load tracking profiles</li>
               <li>Improved class filtering</li>
               <li>Cleaner table columns</li>
-              <li>Bug fixes in testing</li>
             </ul>
             <a href="beta/penance_hunter.html" class="card-link beta">Open Beta</a>
           </div>
