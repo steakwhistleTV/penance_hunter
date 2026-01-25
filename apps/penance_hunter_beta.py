@@ -23,10 +23,11 @@ def _():
     import pandas as pd
     import altair as alt
     import io
+    import json
     import sys
     import re
     import pyfiglet
-    return alt, io, mo, pd, pyfiglet, re, sys
+    return alt, io, json, mo, pd, pyfiglet, re, sys
 
 
 @app.cell(hide_code=True)
@@ -757,9 +758,28 @@ def _(mo):
 @app.cell
 def _(mo):
     # run_button returns True when clicked, then auto-resets to False
-    track_btn = mo.ui.run_button(label="::lucide:plus:: Track Selected")
+    track_btn = mo.ui.run_button(label="::lucide:plus:: Track Selected", kind="success")
     clear_btn = mo.ui.run_button(label="::lucide:trash-2:: Clear All", kind="danger")
     return clear_btn, track_btn
+
+
+@app.cell
+def _(mo):
+    # State to track which profile file has been "cleared" (to prevent auto-reload)
+    get_cleared_profile, set_cleared_profile = mo.state(None)
+    return get_cleared_profile, set_cleared_profile
+
+
+@app.cell
+def _(mo):
+    # File upload for loading a tracking profile
+    load_profile = mo.ui.file(
+        filetypes=[".json"],
+        multiple=False,
+        kind="button",
+        label="Load Profile"
+    )
+    return (load_profile,)
 
 
 @app.cell
@@ -767,63 +787,101 @@ def _(
     category_filter,
     class_filter,
     clear_btn,
+    get_cleared_profile,
     get_tracked,
+    json,
+    load_profile,
     mo,
     pd,
     penance_table,
+    penances_df,
+    set_cleared_profile,
     set_tracked,
     status_filter,
     track_btn,
 ):
     # Track button clicked - run_button.value is True when clicked
     if track_btn.value:
-        selected = penance_table.value
-        if selected is not None and isinstance(selected, pd.DataFrame) and len(selected) > 0:
-            current = get_tracked()
-            existing_ids = {p['Achievement_ID'] for p in current}
-            new_penances = selected.to_dict('records')
-            for p in new_penances:
-                if p['Achievement_ID'] not in existing_ids:
-                    current.append(p)
-            set_tracked(current)
+        _selected = penance_table.value
+        if _selected is not None and isinstance(_selected, pd.DataFrame) and len(_selected) > 0:
+            _current = get_tracked()
+            _existing_ids = {_p['Achievement_ID'] for _p in _current}
+            _new_penances = _selected.to_dict('records')
+            for _p in _new_penances:
+                if _p['Achievement_ID'] not in _existing_ids:
+                    _current.append(_p)
+            set_tracked(_current)
 
-    # Clear button clicked
+    # Load profile - replaces current tracked with penance data looked up by ID
+    # Only load if: file exists, clear not clicked, and this file wasn't already cleared
+    _profile_name = load_profile.name() if load_profile.value else None
+    _was_cleared = _profile_name is not None and _profile_name == get_cleared_profile()
+    if load_profile.value and not clear_btn.value and not _was_cleared:
+        try:
+            _profile_ids = json.loads(load_profile.value[0].contents.decode('utf-8'))
+            if isinstance(_profile_ids, list):
+                # Look up full penance data from penances_df using Achievement_IDs
+                _loaded_penances = []
+                for _aid in _profile_ids:
+                    _matching = penances_df[penances_df['Achievement_ID'] == _aid]
+                    if len(_matching) > 0:
+                        _loaded_penances.append(_matching.iloc[0].to_dict())
+                set_tracked(_loaded_penances)
+                # Clear the "cleared" flag since we loaded a new/same profile
+                set_cleared_profile(None)
+        except (json.JSONDecodeError, IndexError, AttributeError):
+            pass  # Invalid JSON, ignore
+
+    # Clear button clicked - mark profile as cleared and empty tracked list
     if clear_btn.value:
+        if load_profile.value:
+            set_cleared_profile(load_profile.name())
         set_tracked([])
 
     # Get current tracked penances
     tracked_list = get_tracked()
 
-    # Build HTML cards for tracked penances
+    # Create save profile download element - shown directly when there are tracked penances
+    _save_profile = None
     if tracked_list:
-        _cards_html = []
-        for p in tracked_list:
-            icon_path = p.get('Icon', '')
+        _profile_ids = [_p.get('Achievement_ID') for _p in tracked_list]
+        _profile_json = json.dumps(_profile_ids, indent=2)
+        _save_profile = mo.download(
+            data=_profile_json.encode('utf-8'),
+            filename="penance_profile.json",
+            mimetype="application/json",
+            label="Save Profile"
+        )
+
+    # Build cards for tracked penances with X buttons
+    if tracked_list:
+        _cards = []
+        for _p in tracked_list:
+            _icon_path = _p.get('Icon', '')
             # Handle NaN/null values - convert to string and check
-            if pd.isna(icon_path) or not isinstance(icon_path, str):
-                icon_path = ''
+            if pd.isna(_icon_path) or not isinstance(_icon_path, str):
+                _icon_path = ''
             # Extract filename from path like 'content/ui/textures/icons/achievements/achievement_icon_0124'
-            icon_filename = icon_path.split('/')[-1] if icon_path else ''
-            icon_url = f"public/icons/achievements/{icon_filename}.png" if icon_filename else ''
-            title = p.get('Title', 'Unknown')
-            description = p.get('Description', '')
-            progress = p.get('Progress', 0)
-            goal = p.get('Goal', 1)
-            status = p.get('Status', 'Unknown')
-            pct = min((progress / goal) * 100, 100) if goal > 0 else 0
+            _icon_filename = _icon_path.split('/')[-1] if _icon_path else ''
+            _icon_url = f"public/icons/achievements/{_icon_filename}.png" if _icon_filename else ''
+            _title = _p.get('Title', 'Unknown')
+            _description = _p.get('Description', '')
+            _progress = _p.get('Progress', 0)
+            _goal = _p.get('Goal', 1)
+            _pct = min((_progress / _goal) * 100, 100) if _goal > 0 else 0
 
             # Color based on progress
-            if pct >= 100:
-                bar_color = "#22c55e"  # green
-                status_text = "Completed"
-            elif pct >= 50:
-                bar_color = "#f97316"  # orange
-                status_text = f"{progress}/{goal}"
+            if _pct >= 100:
+                _bar_color = "#22c55e"  # green
+                _status_text = "Completed"
+            elif _pct >= 50:
+                _bar_color = "#f97316"  # orange
+                _status_text = f"{_progress}/{_goal}"
             else:
-                bar_color = "#ef4444"  # red
-                status_text = f"{progress}/{goal}"
+                _bar_color = "#ef4444"  # red
+                _status_text = f"{_progress}/{_goal}"
 
-            card = f'''
+            _card_html = mo.Html(f'''
             <div style="
                 display: flex;
                 align-items: center;
@@ -831,37 +889,44 @@ def _(
                 padding: 12px;
                 border: 1px solid var(--border-color, #333);
                 border-radius: 8px;
-                margin-bottom: 8px;
                 background: linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(20,20,20,0.8) 100%);
             ">
-                <img src="{icon_url}" style="width: 64px; height: 64px; border-radius: 4px;" onerror="this.onerror=null; this.src='public/icons/achievements/achievement_icon_0001.png'">
+                <img src="{_icon_url}" style="width: 64px; height: 64px; border-radius: 4px;" onerror="this.onerror=null; this.src='public/icons/achievements/achievement_icon_0001.png'">
                 <div style="flex: 1; min-width: 0;">
-                    <div style="font-weight: bold; margin-bottom: 4px;">{title}</div>
-                    <div style="font-size: 0.8rem; color: var(--text-muted, #888); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{description}</div>
+                    <div style="font-weight: bold; margin-bottom: 4px;">{_title}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted, #888); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{_description}</div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <div style="flex: 1; height: 8px; background: #333; border-radius: 4px; overflow: hidden;">
-                            <div style="width: {pct}%; height: 100%; background: {bar_color}; transition: width 0.3s;"></div>
+                            <div style="width: {_pct}%; height: 100%; background: {_bar_color}; transition: width 0.3s;"></div>
                         </div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted, #888); min-width: 60px; text-align: right;">{status_text}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted, #888); min-width: 60px; text-align: right;">{_status_text}</div>
                     </div>
                 </div>
             </div>
-            '''
-            _cards_html.append(card)
+            ''')
+            _cards.append(_card_html)
 
-        _tracked_content = mo.Html(''.join(_cards_html))
+        # Add save profile button at the bottom of tracked penances
+        _tracked_content = mo.vstack([
+            mo.vstack(_cards, gap=0.5),
+            mo.hstack([_save_profile], justify="end") if _save_profile else None
+        ], gap=1)
     else:
         _tracked_content = mo.md("_Select penances from the Penance List and click 'Track Selected' to add them here._").callout(kind="info")
 
     # Status message for tracking
     _status_msg = mo.md(f"**{len(tracked_list)}** tracked") if tracked_list else mo.md("_Select rows to track_")
 
-    # Filters and buttons in one row
-    _controls = mo.hstack([
+    # Build controls row - filters | track, clear, status | divider | load
+    _control_items = [
         status_filter, category_filter, class_filter,
         mo.Html("<div style='width: 1px; height: 24px; background: var(--border-color, #333); margin: 0 8px;'></div>"),
-        track_btn, clear_btn, _status_msg
-    ], justify="start", align="center", gap=1)
+        track_btn, clear_btn, _status_msg,
+        mo.Html("<div style='width: 1px; height: 24px; background: var(--border-color, #333); margin: 0 8px;'></div>"),
+        load_profile
+    ]
+
+    _controls = mo.hstack(_control_items, justify="start", align="center", gap=1)
 
     # Tabs
     mo.vstack([
