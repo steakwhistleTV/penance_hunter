@@ -23,3 +23,9 @@ CLAUDE.md
 
 # User penance exports (contain UUIDs)
 *-*-*-*-*_*.csv
+
+# Debug logs from mod
+debug_*.log
+
+# Windows Zone.Identifier files
+*:Zone.Identifier

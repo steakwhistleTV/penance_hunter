@@ -3,7 +3,7 @@ local mod = get_mod("penance_exporter")
 local DMF = get_mod("DMF")
 
 -- Version info
-local MOD_VERSION = "2.3.1"
+local MOD_VERSION = "2.4.9"
 
 -- File I/O setup (borrowed from Scrivener pattern)
 local io_lib = DMF:persistent_table("_io")
@@ -147,6 +147,13 @@ local function csv_escape(str)
         return '"' .. str .. '"'
     end
     return str
+end
+
+-- Extract weapon pattern ID from mastery achievement ID
+-- e.g., "mastery_complete_chainaxe_p1" -> "chainaxe_p1"
+local function extract_pattern_from_achievement(achievement_id)
+    if not achievement_id then return nil end
+    return string.match(achievement_id, "^mastery_complete_(.+)$")
 end
 
 -- Parse ISO8601 completion time to readable format
@@ -384,15 +391,25 @@ local function export_penances_csv()
     -- Use echo with localization key and format args separately
     mod:info("Starting penance export for " .. character_name .. " (" .. archetype_name .. ")...")
 
-    -- Get account-level data, XP table, and all character profiles from backend
+    -- Get account-level data, XP table, mastery data, and all character profiles from backend
     if Managers.backend and Managers.backend.interfaces and Managers.backend.interfaces.progression then
         local progression_promise = Managers.backend.interfaces.progression:get_entity_type_progression("character")
         local xp_promise = Managers.backend.interfaces.progression:get_xp_table("character")
 
+        -- Build promise list for character progression
         Promise.all(progression_promise, xp_promise):next(function(result)
-            local characters_progression, xp_per_level_array = unpack(result)
+            local characters_progression, xp_per_level_array = result[1], result[2]
 
-            -- Build XP settings
+            -- Build mastery lookup by fetching each pattern individually
+            -- (get_all_masteries returns empty, but get_mastery_by_pattern works)
+            local mastery_lookup = {}
+            local mastery_svc = Managers.data_service and Managers.data_service.mastery
+
+            -- Function to continue export after mastery data is loaded
+            local function continue_with_mastery_data()
+                mod:info(string.format("Loaded mastery data for %d weapon patterns", table.size(mastery_lookup)))
+
+                -- Build XP settings
             local xp_settings = {
                 level_array = xp_per_level_array,
                 total_xp = xp_per_level_array[#xp_per_level_array],
@@ -582,30 +599,90 @@ local function export_penances_csv()
                 end
             end
 
-            -- Continue with export after getting all data
-            perform_export(player, character_profile, character_name, account_name, platform, account_id,
-                archetype_name, character_level, export_date, timezone_offset, num_characters, account_level,
-                true_level, additional_level, prestige, account_true_level, account_prestige, all_characters)
+                -- Continue with export after getting all data
+                perform_export(player, character_profile, character_name, account_name, platform, account_id,
+                    archetype_name, character_level, export_date, timezone_offset, num_characters, account_level,
+                    true_level, additional_level, prestige, account_true_level, account_prestige, all_characters, mastery_lookup)
+            end -- end continue_with_mastery_data()
+
+            -- Pre-scan achievements to find weapon mastery pattern IDs
+            -- (cached _mastery_track_ids is empty, so we extract from achievement IDs)
+            local pattern_ids = {}
+            local view = Managers.ui and Managers.ui:view_instance("penance_overview_view")
+            if view and view._achievements_by_category then
+                for category_id, achievement_ids in pairs(view._achievements_by_category) do
+                    local category = AchievementCategories[category_id]
+                    if category and category.display_name == "loc_weapon_progression_mastery" then
+                        for _, achievement_id in ipairs(achievement_ids) do
+                            local pattern_id = extract_pattern_from_achievement(achievement_id)
+                            if pattern_id then
+                                table.insert(pattern_ids, pattern_id)
+                            end
+                        end
+                    end
+                end
+            end
+
+            -- Fetch mastery data async for each pattern
+            if mastery_svc and mastery_svc.get_mastery_by_pattern and #pattern_ids > 0 then
+                mod:info(string.format("Fetching mastery data for %d weapon patterns...", #pattern_ids))
+                local pending_count = #pattern_ids
+                local completed_count = 0
+
+                local function on_mastery_complete()
+                    completed_count = completed_count + 1
+                    if completed_count >= pending_count then
+                        mod:info(string.format("Loaded mastery data for %d patterns", table.size(mastery_lookup)))
+                        continue_with_mastery_data()
+                    end
+                end
+
+                for _, pattern_id in ipairs(pattern_ids) do
+                    local pid = pattern_id  -- capture for closure
+                    local success, promise = pcall(mastery_svc.get_mastery_by_pattern, mastery_svc, pid)
+                    if success and promise and promise.next then
+                        promise:next(function(mastery_data)
+                            if mastery_data then
+                                mastery_lookup[pid] = mastery_data
+                            end
+                            on_mastery_complete()
+                        end):catch(function(err)
+                            on_mastery_complete()
+                        end)
+                    else
+                        pending_count = pending_count - 1
+                        if pending_count == 0 then
+                            continue_with_mastery_data()
+                        end
+                    end
+                end
+            else
+                mod:info("No weapon mastery patterns found or service unavailable")
+                continue_with_mastery_data()
+            end
         end):catch(function(error)
             mod:info("Could not fetch account data, continuing without it...")
             -- Continue export without account data
             perform_export(player, character_profile, character_name, account_name, platform, account_id,
-                archetype_name, character_level, export_date, timezone_offset, 0, 0, nil, nil, nil, 0, 0, {})
+                archetype_name, character_level, export_date, timezone_offset, 0, 0, nil, nil, nil, 0, 0, {}, {})
         end)
 
         return -- Exit early, export will continue in promise callback
     else
         -- Backend not available, continue without account data
         perform_export(player, character_profile, character_name, account_name, platform, account_id,
-            archetype_name, character_level, export_date, timezone_offset, 0, 0, nil, nil, nil, 0, 0, {})
+            archetype_name, character_level, export_date, timezone_offset, 0, 0, nil, nil, nil, 0, 0, {}, {})
     end
 end
 
 -- Perform the actual export (separated to handle async account data)
-perform_export = function(player, character_profile, character_name, account_name, platform, account_id, archetype_name, character_level, export_date, timezone_offset, num_characters, account_level, true_level, additional_level, prestige, account_true_level, account_prestige, all_characters)
-    -- CSV header with metadata columns
+perform_export = function(player, character_profile, character_name, account_name, platform, account_id, archetype_name, character_level, export_date, timezone_offset, num_characters, account_level, true_level, additional_level, prestige, account_true_level, account_prestige, all_characters, mastery_lookup)
+    -- Ensure mastery_lookup is a table
+    mastery_lookup = mastery_lookup or {}
+
+    -- CSV header with metadata columns (including weapon mastery columns)
     local csv_lines = {
-        "Export_Account,Export_Platform,Export_Character,Export_Archetype,Export_Mod_Date,Achievement_ID,Category,Icon,Title,Description,Status,Progress,Goal,Progress_Percentage,Completion_Time,Score,Stats_Detail"
+        "Export_Account,Export_Platform,Export_Character,Export_Archetype,Export_Mod_Date,Achievement_ID,Category,Icon,Title,Description,Status,Progress,Goal,Progress_Percentage,Completion_Time,Score,Stats_Detail,Mastery_Level,Mastery_XP,Mastery_XP_Next_Level,Mastery_Progress_Percent"
     }
 
     local total_penances = 0
@@ -699,8 +776,39 @@ perform_export = function(player, character_profile, character_name, account_nam
                         stats_detail = table.concat(stat_parts, "; ")
                     end
 
-                    -- Build CSV row with metadata columns
-                    local row = string.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d%%,%s,%d,%s",
+                    -- Extract weapon mastery data for weapon penance achievements
+                    local mastery_level, mastery_xp, mastery_xp_next, mastery_progress_pct = "", "", "", ""
+                    if category and category.display_name == "loc_weapon_progression_mastery" then
+                        local pattern_id = extract_pattern_from_achievement(achievement_id)
+                        if pattern_id and mastery_lookup[pattern_id] then
+                            local m = mastery_lookup[pattern_id]
+                            mastery_level = m.mastery_level or m.level or 0
+                            local start_xp = m.start_xp or 0
+                            local end_xp = m.end_xp or 0
+                            local current_xp = m.current_xp or m.xp or 0
+
+                            -- Store values like 2.4.4: total XP, next level threshold
+                            mastery_xp = current_xp  -- Total XP earned
+                            mastery_xp_next = end_xp  -- XP threshold for next level
+
+                            -- Calculate progress percentage within current level
+                            local xp_in_level = current_xp - start_xp
+                            local xp_for_level = end_xp - start_xp
+                            if xp_for_level > 0 then
+                                mastery_progress_pct = math.floor((xp_in_level / xp_for_level) * 100)
+                            else
+                                mastery_progress_pct = 100  -- Level complete
+                            end
+
+                            -- Override progress/goal to show level progress (like 2.4.4: 16/20)
+                            progress = mastery_level
+                            goal = 20  -- Max mastery level
+                            progress_percentage = math.floor((mastery_level / 20) * 100)
+                        end
+                    end
+
+                    -- Build CSV row with metadata columns (including weapon mastery)
+                    local row = string.format("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d%%,%s,%d,%s,%s,%s,%s,%s",
                         csv_escape(account_name),
                         csv_escape(platform),
                         csv_escape(character_name),
@@ -717,7 +825,11 @@ perform_export = function(player, character_profile, character_name, account_nam
                         progress_percentage,
                         csv_escape(parse_completion_time(completion_time)),
                         achievement.score or 0,
-                        csv_escape(stats_detail)
+                        csv_escape(stats_detail),
+                        csv_escape(tostring(mastery_level)),
+                        csv_escape(tostring(mastery_xp)),
+                        csv_escape(tostring(mastery_xp_next)),
+                        csv_escape(tostring(mastery_progress_pct))
                     )
 
                     table.insert(csv_lines, row)
@@ -859,6 +971,197 @@ mod.on_all_mods_loaded = function()
 
     mod:command("debug_player", "Debug player and character info to find correct field names", function()
         debug_player_info()
+    end)
+
+    mod:command("debug_mastery", "Debug weapon mastery data structure", function()
+        local log_lines = {}
+        local function log(msg)
+            table.insert(log_lines, msg)
+        end
+
+        local function write_log()
+            local timestamp = os_lib.date("%Y%m%d_%H%M%S")
+            local filename = string.format("debug_mastery_%s.log", timestamp)
+            local filepath = string.format("%s/%s", mod_dir, filename)
+
+            local f = io_lib.open(filepath, "w")
+            if f then
+                for _, line in ipairs(log_lines) do
+                    f:write(line .. "\n")
+                end
+                f:close()
+                mod:echo("Mastery debug written to: " .. filename)
+                mod:notify("Debug log saved to penance_exporter folder")
+            else
+                mod:echo("ERROR: Could not write debug log")
+            end
+        end
+
+        log("=== DEBUG: Weapon Mastery Data ===")
+        log(string.format("Timestamp: %s", os_lib.date("%Y-%m-%d %H:%M:%S")))
+        log("")
+
+        -- Check if mastery service exists
+        if not Managers.data_service then
+            log("ERROR: Managers.data_service not available")
+            write_log()
+            return
+        end
+
+        if not Managers.data_service.mastery then
+            log("ERROR: Managers.data_service.mastery not available")
+            log("")
+            log("Available services in data_service:")
+            for k, v in pairs(Managers.data_service) do
+                log("  - " .. tostring(k) .. " (" .. type(v) .. ")")
+            end
+            write_log()
+            return
+        end
+
+        log("Mastery service found!")
+        local mastery_svc = Managers.data_service.mastery
+        log("")
+
+        -- List all fields on mastery service
+        log("--- Fields on mastery_svc ---")
+        for k, v in pairs(mastery_svc) do
+            log("  " .. tostring(k) .. " (" .. type(v) .. ")")
+        end
+        log("")
+
+        -- Check _mastery_tracks
+        log("--- _mastery_tracks ---")
+        if mastery_svc._mastery_tracks then
+            local count = 0
+            for k, v in pairs(mastery_svc._mastery_tracks) do
+                count = count + 1
+            end
+            log(string.format("Total entries: %d", count))
+            log("")
+
+            -- Show first 3 entries with full detail including nested data
+            local shown = 0
+            for track_id, track_data in pairs(mastery_svc._mastery_tracks) do
+                if shown < 3 then
+                    log(string.format("Track: %s", tostring(track_id)))
+                    if type(track_data) == "table" then
+                        for k, v in pairs(track_data) do
+                            if type(v) == "table" then
+                                log(string.format("    %s = table:", tostring(k)))
+                                for k2, v2 in pairs(v) do
+                                    local val_str = tostring(v2)
+                                    if type(v2) == "table" then
+                                        val_str = "table with " .. table.size(v2) .. " entries"
+                                    end
+                                    log(string.format("        %s = %s (%s)", tostring(k2), val_str, type(v2)))
+                                end
+                            else
+                                log(string.format("    %s = %s (%s)", tostring(k), tostring(v), type(v)))
+                            end
+                        end
+                    end
+                    log("")
+                    shown = shown + 1
+                end
+            end
+
+            -- Also try get_mastery_by_pattern for a known weapon (returns Promise)
+            log("--- Testing get_mastery_by_pattern('chainaxe_p1') ---")
+            if mastery_svc.get_mastery_by_pattern then
+                local success, promise = pcall(mastery_svc.get_mastery_by_pattern, mastery_svc, "chainaxe_p1")
+                if success and promise and promise.next then
+                    log("Got Promise, waiting for resolution...")
+                    promise:next(function(mastery_data)
+                        local async_log = {}
+                        table.insert(async_log, "")
+                        table.insert(async_log, "=== ASYNC: get_mastery_by_pattern('chainaxe_p1') resolved ===")
+                        if type(mastery_data) == "table" then
+                            for k, v in pairs(mastery_data) do
+                                if type(v) == "table" then
+                                    table.insert(async_log, string.format("    %s = table:", tostring(k)))
+                                    for k2, v2 in pairs(v) do
+                                        local val_str = tostring(v2)
+                                        if type(v2) == "table" then
+                                            val_str = "table with " .. table.size(v2) .. " entries"
+                                        end
+                                        table.insert(async_log, string.format("        %s = %s (%s)", tostring(k2), val_str, type(v2)))
+                                    end
+                                else
+                                    table.insert(async_log, string.format("    %s = %s (%s)", tostring(k), tostring(v), type(v)))
+                                end
+                            end
+                        else
+                            table.insert(async_log, "Result is not a table: " .. type(mastery_data))
+                        end
+
+                        -- Write async results to separate file
+                        local ts = os_lib.date("%Y%m%d_%H%M%S")
+                        local fn = string.format("debug_mastery_async_%s.log", ts)
+                        local fp = string.format("%s/%s", mod_dir, fn)
+                        local f = io_lib.open(fp, "w")
+                        if f then
+                            for _, line in ipairs(async_log) do
+                                f:write(line .. "\n")
+                            end
+                            f:close()
+                            mod:echo("Async mastery data written to: " .. fn)
+                        end
+                    end):catch(function(err)
+                        mod:echo("Promise error: " .. tostring(err))
+                    end)
+                else
+                    log("Failed or not a promise: " .. tostring(promise))
+                end
+            end
+
+            -- Check _backend_interface for track state
+            log("")
+            log("--- _backend_interface ---")
+            if mastery_svc._backend_interface then
+                for k, v in pairs(mastery_svc._backend_interface) do
+                    log(string.format("    %s = %s (%s)", tostring(k), tostring(v), type(v)))
+                end
+            else
+                log("_backend_interface: nil")
+            end
+        else
+            log("_mastery_tracks: nil")
+        end
+
+        -- Check _mastery_track_ids
+        log("--- _mastery_track_ids ---")
+        if mastery_svc._mastery_track_ids then
+            local count = 0
+            for k, v in pairs(mastery_svc._mastery_track_ids) do
+                count = count + 1
+            end
+            log(string.format("Total entries: %d", count))
+            log("")
+
+            -- Show all mappings
+            for pattern_id, track_id in pairs(mastery_svc._mastery_track_ids) do
+                log(string.format("  %s -> %s", tostring(pattern_id), tostring(track_id)))
+            end
+        else
+            log("_mastery_track_ids: nil")
+        end
+        log("")
+
+        -- Check methods via metatable
+        log("--- Methods (via metatable) ---")
+        local mt = getmetatable(mastery_svc)
+        if mt and mt.__index then
+            for k, v in pairs(mt.__index) do
+                if type(v) == "function" then
+                    log("  " .. tostring(k) .. "()")
+                end
+            end
+        else
+            log("No metatable or __index found")
+        end
+
+        write_log()
     end)
 
     mod:echo(loc("msg_mod_loaded") .. " v" .. MOD_VERSION .. " " .. loc("msg_mod_loaded_suffix"))

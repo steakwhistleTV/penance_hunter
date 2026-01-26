@@ -940,5 +940,16 @@ def _(
     return
 
 
+@app.cell
+def _(penances_df):
+    penances_df
+    return
+
+
+@app.cell
+def _():
+    return
+
+
 if __name__ == "__main__":
     app.run()
