@@ -265,6 +265,7 @@ def main():
               <li>Progress charts by class</li>
               <li>Category &amp; class breakdown</li>
               <li>Operative stats display</li>
+              <li>Granular weapon mastery (X/20)</li>
             </ul>
             <a href="apps/penance_hunter.html" class="card-link">Open Stable</a>
           </div>

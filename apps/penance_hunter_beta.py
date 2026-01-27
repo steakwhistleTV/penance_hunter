@@ -65,6 +65,7 @@ def _(mo):
                 },
                 orientation="vertical",
             ),
+            mo.md("_::lucide:refresh-cw:: If the notebook stops responding, refresh the page._").callout(kind="warn"),
         ],
         footer=mo.md("_Don't ever say N**gle..._"),
     )
@@ -73,7 +74,7 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo, sys):
-    default_csv = mo.notebook_location() / "public" / "00000000-0000-0000-0000-000000000000_20260118_103938.csv"
+    default_csv = mo.notebook_location() / "public" / "00000000-0000-0000-0000-000000000000_20260126_161207.csv"
 
     def is_wasm() -> bool:
         return "pyodide" in sys.modules
