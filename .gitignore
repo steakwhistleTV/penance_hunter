@@ -23,6 +23,8 @@ CLAUDE.md
 
 # User penance exports (contain UUIDs)
 *-*-*-*-*_*.csv
+# But allow sample CSVs in public folder
+!apps/public/*.csv
 
 # Debug logs from mod
 debug_*.log
