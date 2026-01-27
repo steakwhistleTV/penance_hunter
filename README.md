@@ -25,6 +25,7 @@ Track and visualize your Warhammer 40,000: Darktide penance progress.
 - Account overview with completion %, levels, prestige
 - All operatives with individual stats
 - Category & class breakdown charts
+- Granular weapon mastery progress (level X/20, XP)
 - Progress timeline with date filtering
 - Filterable penance list
 - Track specific penances
